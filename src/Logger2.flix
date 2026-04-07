@@ -269,7 +269,7 @@ pub mod Logger2 {
                     match resSock {
                         case Err(_t) => Logger.log(s, m); k()
                         case Ok(sock) => {
-                            let str = "[" + ToString.toString(s)+ "] " + RichString.toPlainString(m) + "\n";
+                            let str = "[${s}] ${RichString.toPlainString(m)}\n";
                             region rc {
                                 let bytes = String.toBytes(str);
                                 let arr = Vector.toArray(rc, bytes);
@@ -286,6 +286,8 @@ pub mod Logger2 {
             }
         }
     }
-
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
     pub def runWithTCP(ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger) + Net.TcpConnect + Logger + IO = handleWithTCP(ip, port, f)()
 }
