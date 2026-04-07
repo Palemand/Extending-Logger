@@ -274,13 +274,23 @@ pub mod Logger2 {
         }
 
     ///
-    /// Handles `f` with first `h1` and then `h2`. 
-    /// Generally applicable, not limited to be used in logger.
+    /// Handles the Logger effect in `f` with both `h1` and `h2`. 
     ///
     pub def runWithMultisink(
-        h1: (Unit -> a \ ef) -> a \ ef1, 
-        h2: (Unit -> a \ ef) -> a \ ef2, 
-        f: Unit -> a \ ef): (a, a) \ ef2 + ef1 = 
-        (h1(f), h2(f))
+        h1: (Unit -> Unit \ Logger) -> x \ ef4, 
+        h2: (Unit -> Unit \ Logger) -> y \ ef5, 
+        f: Unit -> a \ ef3): a \ (ef3 - Logger) + ef4 + ef5 = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let _ = run {
+                     Logger.log(s, m)
+                 } with h1;
+                 let _ = run {
+                     Logger.log(s, m)
+                 } with h2;
+                k()
+        }
 
 }
