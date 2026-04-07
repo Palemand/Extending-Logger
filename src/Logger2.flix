@@ -221,8 +221,8 @@ pub mod Logger2 {
             match res {
                 case Ok(_response) => k()
                 case Err(_t) => {
-                    Logger.log(s, m);
                     Logger.warn(RichString.fromString("Logging to http failed. Using fallback"));
+                    Logger.log(s, m);
                     k()
                 }
             }
