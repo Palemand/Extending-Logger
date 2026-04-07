@@ -73,16 +73,8 @@ pub mod Logger2 {
         x -> run {
             f(x)
         } with handler Logger {
-            def log(s, m, k) = {
-                let prefix = match s {
-                    case Severity.Debug => cyan("[Debug]")
-                    case Severity.Fatal => bold(red("[Fatal]"))
-                    case Severity.Info  => green("[Info]")
-                    case Severity.Trace => gray("[Trace]")
-                    case Severity.Warn  => yellow("[Warn]")
-                };
-                let output = prefix + text(" ") + m;
-                Console.println(RichString.toString(output));
+            def log(_, m, k) = {
+                Console.println("${m}");
                 k()
             }
         }
@@ -107,16 +99,8 @@ pub mod Logger2 {
         x -> run {
             f(x)
         } with handler Logger {
-            def log(s, m, k) = {
-                let prefix = match s {
-                    case Severity.Debug => cyan("[Debug]")
-                    case Severity.Fatal => bold(red("[Fatal]"))
-                    case Severity.Info  => green("[Info]")
-                    case Severity.Trace => gray("[Trace]")
-                    case Severity.Warn  => yellow("[Warn]")
-                };
-                let output = prefix + text(" ") + m;
-                Console.eprintln(RichString.toString(output));
+            def log(_, m, k) = {
+                Console.eprintln("${m}");
                 k()
             }
         }
@@ -129,6 +113,52 @@ pub mod Logger2 {
     /// Prints to standard error.
     ///
     pub def runWithStdErr(f: Unit -> a \ ef): a \ ef - Logger + Console = handleWithStdErr(f)()
+
+    pub def withStdFormat(f: Unit -> a \ ef): a \ ef + Logger = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let prefix = match s {
+                    case Severity.Debug => cyan("[Debug]")
+                    case Severity.Fatal => bold(red("[Fatal]"))
+                    case Severity.Info  => green("[Info]")
+                    case Severity.Trace => gray("[Trace]")
+                    case Severity.Warn  => yellow("[Warn]")
+                };
+                let output = prefix + text(" ") + m;
+                Logger.log(s, output);
+                k()
+        }
+
+    pub def withCustomFormat(format: (Severity, RichString) -> RichString \ ef1, f: Unit -> a \ ef2): a \ ef1 + ef2 + Logger = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let m_ = format(s, m);
+                Logger.log(s, m_);
+                k()
+        }
+
+    pub def withMoreCustomFormat(format: (Severity, RichString, b) -> RichString \ ef1, p: b, f: Unit -> a \ ef2): a \ ef1 + ef2 + Logger = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let m_ = format(s, m, p);
+                Logger.log(s, m_);
+                k()
+        }
+
+    pub def runWithIOButDifferentFromTheOtherRunWithIO(f: Unit -> a \ ef): a \ ef - Logger + IO = 
+        run {
+            f()
+        } with handler Logger {
+            def log(_s, m, k) = 
+                let _ = println(m);
+                k()
+        }
 
     ///
     /// Aborts with the message `m` from `Logger.log` if given function `g` returns true.
