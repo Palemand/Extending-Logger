@@ -419,6 +419,50 @@ pub mod Logger2 {
                 }
             }
         }
+    ///
+    /// Handles the `Logger` effect, by returning a string instead.
+    ///
+    pub def handleWithRichString(f: a -> b \ ef): a -> RichString \ (ef - Logger) = 
+        x -> run {
+            let _ = f(x); RichString.fromString("")
+        } with handler Logger {
+            def log(s, m, k) = {
+                let prefix = match s {
+                    case Severity.Debug => cyan("[Debug]")
+                    case Severity.Fatal => bold(red("[Fatal]"))
+                    case Severity.Info  => green("[Info]")
+                    case Severity.Trace => gray("[Trace]")
+                    case Severity.Warn  => yellow("[Warn]")
+                };
+                let output = prefix + text(" ") + m;
+                let _ = k();
+                output
+            }
+        }
+
+    ///
+    /// Handles the `Logger` effect, by returning a string instead.
+    ///
+    pub def runWithRichString(f: Unit -> a \ ef): RichString \ (ef - Logger) = handleWithRichString(f)()
+
+    ///
+    /// Handles the `Logger` effect, by returning a string instead.
+    ///
+    pub def handleWithString(f: a -> b \ ef): a -> String \ (ef - Logger) = 
+        x -> run {
+            let _ = f(x); ""
+        } with handler Logger {
+            def log(s, m, k) = {
+                let str = "[${s}] ${RichString.toPlainString(m)}";
+                let _ = k();
+                str
+            }
+        }
+
+    ///
+    /// Handles the `Logger` effect, by returning a string instead.
+    ///
+    pub def runWithString(f: Unit -> a \ ef): String \ (ef - Logger) = handleWithString(f)()
         
     ///
     /// Prepends a timestamp on every instance of `Logger.log`
