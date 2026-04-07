@@ -2,7 +2,7 @@ pub mod Logger2 {
     use Sys.Console.print
     use Logger2.handleWithNoFormatting
     use Net.TcpSocket
-    use Sys.Console
+    use Sys.{Console, Env}
     use RichString.{gray, cyan, green, yellow, red, bold, text};
     use Severity.{Warn, Fatal, Trace, Debug, Info}
 
@@ -307,6 +307,41 @@ pub mod Logger2 {
 
     pub def runWithNoFormatting(f: Unit -> a \ ef): a \ ef - Logger + IO = 
         handleWithNoFormatting(f)() 
+
+    pub def handleWithEnvInfo(f: a -> b \ ef): a -> b \ ef + Logger + Sys.Env = 
+        x -> run {
+            f(x)
+        } with handler Logger {
+            def log(s, m, k) = 
+                let linesep = match Env.getLineSeparator() {
+                    case "\n" => "\\n"
+                    case "\r" => "\\r"
+                    case _ => "Unknown"
+                };
+                let p = Map#{
+                    "args"              => List.toString(Sys.Env.getArgs()),
+                    "currentWorkingDir" => Option.getWithDefault("None", Sys.Env.getCurrentWorkingDirectory()),
+                    "fileSeparator"     => Env.getFileSeparator(),
+                    "lineSeparator"     => linesep,
+                    "osArch"            => Option.getWithDefault("None", Env.getOsArch()),
+                    "osName"            => Option.getWithDefault("None", Env.getOsName()),
+                    "osVersion"         => Option.getWithDefault("None", Env.getOsVersion()),
+                    "pathSeparator"     => Env.getPathSeparator(),
+                    "temporaryDirectory"=> Option.getWithDefault("None", Env.getTemporaryDirectory()),
+                    "userHomeDirectory" => Option.getWithDefault("None", Env.getUserHomeDirectory()),
+                    "userName"          => Option.getWithDefault("None", Env.getUserName()),
+                    "virtualProcessors" => Int32.toString(Env.getVirtualProcessors())
+                }
+                |> Map.filter(v -> v != "None")
+                |> Map.foldLeftWithKey(acc -> c -> v -> "${acc}\n${c} => ${v}", "");
+                let m_ = m + RichString.text("${p}");
+                Logger.log(s, m_);
+                k()
+        }
+
+    pub def withEnvInfo(f: Unit -> b \ ef): b \ ef + Logger + Sys.Env = 
+        handleWithEnvInfo(f)()
+
 
 
     ///
