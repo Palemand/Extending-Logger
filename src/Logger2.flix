@@ -1,4 +1,5 @@
 pub mod Logger2 {
+    use Logger2.handleWithNoFormatting
     use Sys.Console
     use RichString.{gray, cyan, green, yellow, red, bold, text};
     use Severity.{Warn, Fatal, Trace, Debug, Info}
@@ -292,5 +293,17 @@ pub mod Logger2 {
                  } with h2;
                 k()
         }
+
+    pub def handleWithNoFormatting(f: a -> b \ ef): a -> b \ ef - Logger + IO = 
+        x -> run {
+            f(x)
+        } with handler Logger {
+            def log(_, m, k) = 
+                let _ = println(RichString.toPlainString(m));
+                k()
+        }
+
+    pub def runWithNoFormatting(f: Unit -> a \ ef): a \ ef - Logger + IO = 
+        handleWithNoFormatting(f)() 
 
 }
