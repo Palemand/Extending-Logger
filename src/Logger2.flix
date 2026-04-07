@@ -477,4 +477,28 @@ pub mod Logger2 {
             k()
     }
 
+
+    pub def withNoRepeats(f: Unit -> a \ ef): a \ ef + Logger = 
+        region rc {
+            let r: Ref[List[(Severity, RichString)], rc] = Ref.fresh(rc, Nil);
+            run {
+                f()
+            } with handler Logger {
+                def log(s, m, k) = 
+                    let last = Ref.get(r);
+                    match last {
+                        case Nil => 
+                            Logger.log(s, m);
+                            Ref.put((s, m) :: Nil, r)
+                        case xs => 
+                            if (List.memberOf((s, m), xs)) {
+                                ()
+                            } else {
+                                Logger.log(s, m);
+                                Ref.put((s, m) :: xs, r)
+                            }
+                    };
+                    k()
+            }
+        }
 }
