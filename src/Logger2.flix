@@ -254,4 +254,43 @@ pub mod Logger2 {
         } with handler Logger {
             def log(_s, _m, k) = k()
         }
+    ///
+    /// Middleware handler that prepends an emoji corresponding to the severity level
+    ///
+    pub def withEmoji(f: Unit -> a \ ef): a \ ef + Logger = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let e = match s {
+                    case Severity.Fatal => "🔥"
+                    case Severity.Warn => "⚠️"
+                    case Severity.Trace => "🫆"
+                    case Severity.Debug => "🐛"
+                    case Severity.Info => "ℹ️"
+                } + " ";
+                let m_ = RichString.text(e) + m;
+                k(Logger.log(s, m_))
+        }
+
+    ///
+    /// Handles the Logger effect in `f` with both `h1` and `h2`. 
+    ///
+    pub def runWithMultisink(
+        h1: (Unit -> Unit \ Logger) -> x \ ef4, 
+        h2: (Unit -> Unit \ Logger) -> y \ ef5, 
+        f: Unit -> a \ ef3): a \ (ef3 - Logger) + ef4 + ef5 = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let _ = run {
+                     Logger.log(s, m)
+                 } with h1;
+                 let _ = run {
+                     Logger.log(s, m)
+                 } with h2;
+                k()
+        }
+
 }
