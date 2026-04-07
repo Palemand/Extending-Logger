@@ -419,4 +419,18 @@ pub mod Logger2 {
                 }
             }
         }
+        
+    ///
+    /// Prepends a timestamp on every instance of `Logger.log`
+    ///
+    pub def withTimestamp(f: Unit -> a \ ef): a \ (ef - Logger) + Logger + Timestamp = 
+    run {
+        f()
+    } with handler Logger {
+        def log(s, m, k) = 
+            let output = RichString.text("(${Timestamp.getTimestamp()})  ${m}");
+            Logger.log(s, output);
+            k()
+    }
+
 }
