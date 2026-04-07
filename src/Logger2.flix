@@ -1,4 +1,5 @@
 pub mod Logger2 {
+    use Net.TcpSocket
     use Sys.Console
     use RichString.{gray, cyan, green, yellow, red, bold, text};
     use Severity.{Warn, Fatal, Trace, Debug, Info}
@@ -254,4 +255,37 @@ pub mod Logger2 {
         } with handler Logger {
             def log(_s, _m, k) = k()
         }
+
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
+    pub def handleWithTCP(ip: Net.IpAddr, port: Int16, f: a -> b \ ef): a -> b \ (ef - Logger) + Net.TcpConnect + Logger + IO = {
+        x -> {
+            let resSock = Net.TcpConnect.connect(ip, port);
+            run {
+                f(x)
+            } with handler Logger {
+                def log(s, m, k) = {
+                    match resSock {
+                        case Err(_t) => Logger.log(s, m); k()
+                        case Ok(sock) => {
+                            let str = "[" + ToString.toString(s)+ "] " + RichString.toPlainString(m) + "\n";
+                            region rc {
+                                let bytes = String.toBytes(str);
+                                let arr = Vector.toArray(rc, bytes);
+                                let res = Net.TcpSocket.write(arr, sock);
+                                match res {
+                                    case Err(_t) => Logger.log(s, m)
+                                    case Ok(_) => ()
+                                }
+                            };
+                            k()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    pub def runWithTCP(ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger) + Net.TcpConnect + Logger + IO = handleWithTCP(ip, port, f)()
 }
