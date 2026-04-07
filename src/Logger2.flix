@@ -1,4 +1,5 @@
 pub mod Logger2 {
+    use Sys.Console.print
     use Logger2.handleWithNoFormatting
     use Net.TcpSocket
     use Sys.Console
@@ -338,8 +339,59 @@ pub mod Logger2 {
             }
         }
     }
+    
     ///
     /// Handles the `Logger` effect, by sending it over a TCP connection.
     ///
     pub def runWithTCP(ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger) + Net.TcpConnect + Logger + IO = handleWithTCP(ip, port, f)()
+
+    ///
+    /// Handles the `Logger` effect, by batching multiples of the same log messages.
+    ///
+    pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger + IO =
+        region rc {
+            let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
+            let n = Ref.fresh(rc, 0);
+            run {
+                f()
+            } with handler Logger {
+                def log(s, m, k) = {
+                    let (ls, lm) = Ref.get(last);
+                    println("           Last message was ${RichString.toString(lm)} and current is ${RichString.toString(m)}");
+                    let sameSev = s == ls;
+                    let sameMsg = m == lm;
+                    let cmp = s == ls and m == lm;
+                    let count = Ref.get(n);
+                    println("   ${count}");
+                    println("   ${sameSev}, ${sameMsg}");
+                    match (cmp, count) {
+                        case (_, 0) => {
+                            println("       DOing the shit where count == 0");
+                            Ref.put(1, n);
+                            Ref.put((s, m), last);
+                            Logger.log(s, m)
+                        }
+                        case (true, _) => {
+                            println("       DOing the shit where its cmp == true");
+                            Ref.put(count + 1, n)
+                        }
+                        case (_) if (count == 1) => {
+                            println("       DOing the shit where its count == 1");
+                            println(Ref.get(n));
+                            Ref.put(1, n);
+                            Ref.put((s, m), last);
+                            Logger.log(s, m)
+                        }
+                        case _ => {
+                            println("       Doing the stuff where its not count ==1");
+                            Logger.log(Info, RichString.fromString("    Repeated ${count}X times."));
+                            Ref.put(1, n);
+                            Ref.put((s, m), last);
+                            Logger.log(s, m)
+                        }
+                    };
+                    k()
+                }
+            }
+        }
 }
