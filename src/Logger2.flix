@@ -477,13 +477,14 @@ pub mod Logger2 {
             k()
     }
 
-    pub def withThread(h1: (Unit -> Unit \ Logger) -> x \ ef4, f: Unit -> a \ ef ): a \ (ef - Logger) + Chan =
+    pub def withThread(h1: Unit -> a \ (ef + Logger), f: Unit -> a \ ef ): a \ (ef - Logger) + Chan =
         region rc {
-            let logChannel = Channel.unbuffered();
-            spawn logging(h1, snd (logChannel)) @ rc;
+            let (tx, rx) = Channel.unbuffered();
+            spawn logging(h1, rx) @ rc;
             ???
         }
-    def logging(h1: (Unit -> Unit \ Logger) -> x \ ef, reciever: Receiver[(Severity, RichString)]): Unit \ (ef -) + NonDet + Chan =
+    
+    def logging(h1: Unit -> a \ (ef + Logger), reciever: Receiver[(Severity, RichString)]): Unit \ NonDet + Chan =
         run {
             let (s, m) = Channel.recv(reciever);
             Logger.log(s, m);
