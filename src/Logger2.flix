@@ -206,4 +206,52 @@ pub mod Logger2 {
             f()
         } with runWithFilter((sev, _) -> Order.greaterEqual(sev, s))
 
+
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    /// 
+    /// Raises a new `Logger` effect for fallback incase Http fails.
+    ///
+    pub def handleWithHttp(url: String, f: a -> b \ ef1): a -> b \ (ef1 - Logger) + Net.Http + Logger = 
+    x -> run {
+        f(x)
+    } with handler Logger {
+        def log(s, m, k) = {
+            let res = Net.Http.post(url, "[" + ToString.toString(s) + "] " + RichString.toPlainString(m));
+            match res {
+                case Ok(_response) => k()
+                case Err(_t) => {
+                    Logger.log(s, m);
+                    Logger.warn(RichString.fromString("Logging to http failed. Using fallback"));
+                    k()
+                }
+            }
+        }
+    }
+
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    ///
+    pub def runWithHttp(url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger) + Net.Http = 
+        run {
+            handleWithHttp(url, f)()
+        } with runWithIgnore
+
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    ///
+    /// Raises a new `Logger` effect for fallback incase Http fails.
+    ///
+    pub def runWithHttpFallback(url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger) + Net.Http + Logger = handleWithHttp(url, f)()
+
+
+    ///
+    /// Handles the `Logger` effect, by ignoring it.
+    ///
+    pub def runWithIgnore(f: Unit -> b \ ef): b \ (ef - Logger) = 
+        run {
+            f()
+        } with handler Logger {
+            def log(_s, _m, k) = k()
+        }
 }
