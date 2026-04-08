@@ -600,7 +600,7 @@ pub mod Logger2 {
                     let st = now - startMillis;
                     let ver = st / durationMillis;
                     let path = "${dir}${sep}log${Int64.toString(ver)}.log";
-                    let output = "[${s} ${RichString.toPlainString(m)}\n]";
+                    let output = "[${s}] ${RichString.toPlainString(m)}\n";
                     let _ = Fs.FileWrite.append(str = output, path);
                     k()
                 }
@@ -608,7 +608,43 @@ pub mod Logger2 {
         }
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
+    /// User is responsible for creating directory.
     ///
     pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, dir: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Env = 
         handleWithScheduledFiles(startMillis, dur, dir, f)()
+
+    ///
+    /// Handles the `Logger` effect, by writing to a set of files, each with a max fileSize.
+    /// User is responsible for creating directory.
+    ///
+    pub def handleWithFileSizeRollover(max: Fs.Size, dir: String, f: a -> b \ ef): (a -> b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Env) = 
+        x -> {
+            region rc {
+                let iter = Ref.fresh(rc, 0);
+                let sep = Env.getFileSeparator();
+                run {
+                    f(x)
+                } with handler Logger {
+                    def log(s, m, k) = {
+                        let ver = Ref.get(iter);
+                        let curpath = "${dir}${sep}log${Int32.toString(ver)}.log";
+                        let curSize = Result.getWithDefault(Fs.Size.zero(), Fs.FileSize.size(curpath));
+                        let over = curSize > max;
+                        if (over) {
+                            Ref.put(Ref.get(iter) + 1, iter)
+                        };
+                        let ver_ = Ref.get(iter);
+                        let path_ = "${dir}${sep}log${Int32.toString(ver_)}.log";
+                        let output = "[${s}] ${RichString.toPlainString(m)}\n";
+                        let _ = Fs.FileWrite.append(str = output, path_);
+                        k()
+                    }
+                }
+            }
+        }
+    ///
+    /// Handles the `Logger` effect, by writing to a set of files, each with a max fileSize.
+    /// User is responsible for creating directory.
+    ///
+    pub def runWithFileSizeRollover(max: Fs.Size, dir: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Env = handleWithFileSizeRollover(max, dir, f)()
 }
