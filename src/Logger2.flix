@@ -476,18 +476,30 @@ pub mod Logger2 {
             Logger.log(s, output);
             k()
     }
-
-    pub def withThread(h1: Unit -> a \ (ef + Logger), f: Unit -> a \ ef ): a \ (ef - Logger) + Chan =
+    ///
+    /// Spawns a seperate thread for doing the logging.
+    ///
+    pub def withThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan)) -> a \ IO + NonDet + Chan, f: Unit -> a \ ef ): a \ (ef - Logger) + Chan + NonDet + IO =
         region rc {
             let (tx, rx) = Channel.unbuffered();
-            spawn logging(h1, rx) @ rc;
-            ???
+            spawn loggingThread(h1, rx) @ rc;
+            run {
+                f()
+            } with handler Logger {
+                def log(s, m, k) = {
+                    Channel.send((s, m), tx);
+                    k()
+                }
+            }
         }
-    
-    def logging(h1: Unit -> a \ (ef + Logger), reciever: Receiver[(Severity, RichString)]): Unit \ NonDet + Chan =
-        run {
+    ///
+    /// Helper function for `withThread` doing the logging 
+    ///
+    def loggingThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan)) -> a \ IO + NonDet + Chan , reciever: Receiver[(Severity, RichString)]): Unit \ IO + NonDet + Chan =
+        let _x = run {
             let (s, m) = Channel.recv(reciever);
-            Logger.log(s, m);
-            logging(reciever)
-        } with h1
+            Logger.log(s, m)
+        } with h1;
+        loggingThread(h1, reciever)
+        
 }
