@@ -587,12 +587,22 @@ pub mod Logger2 {
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
     ///
-    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, f: a -> b \ ef): a -> b \ ef = 
-        x -> run {
-            f(x)
-        } with handler Logger {
-            def log(s, m, k) = {
-                ???
+    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, dir: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Env = 
+        let durationMillis = Time.Duration.toMillis(dur);              
+        x -> {
+            let sep = Env.getFileSeparator();
+            run {
+                f(x)
+            } with handler Logger {
+                def log(s, m, k) = {
+                    let now = Time.Clock.now();
+                    let st = now - startMillis;
+                    let ver = st / durationMillis;
+                    let path = "${dir}${sep}log${Int64.toString(ver)}.log";
+                    let output = "[${s} ${RichString.toPlainString(m)}]";
+                    let _ = Fs.FileWrite.append(str = output, path);
+                    k()
+                }
             }
         }
 }
