@@ -626,13 +626,19 @@ pub mod Logger2 {
                     f(x)
                 } with handler Logger {
                     def log(s, m, k) = {
-                        let ver = Ref.get(iter);
-                        let curpath = "${dir}${sep}log${Int32.toString(ver)}.log";
-                        let curSize = Result.getWithDefault(Fs.Size.zero(), Fs.FileSize.size(curpath));
-                        let over = curSize > max;
-                        if (over) {
-                            Ref.put(Ref.get(iter) + 1, iter)
+                        def loop() = {
+                            let ver = Ref.get(iter);
+                            let curpath = "${dir}${sep}log${Int32.toString(ver)}.log";
+                            let curSize = Result.getWithDefault(Fs.Size.zero(), Fs.FileSize.size(curpath));
+                            let over = curSize > max;
+                            if (over) {
+                                Ref.put(Ref.get(iter) + 1, iter);
+                                loop()
+                            } else {
+                                ()
+                            }
                         };
+                        loop();
                         let ver_ = Ref.get(iter);
                         let path_ = "${dir}${sep}log${Int32.toString(ver_)}.log";
                         let output = "[${s}] ${RichString.toPlainString(m)}\n";
