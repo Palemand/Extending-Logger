@@ -586,9 +586,10 @@ pub mod Logger2 {
 
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
+    /// User is responsible for creating directory.
     ///
     pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, dir: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Env = 
-        let durationMillis = Time.Duration.toMillis(dur);              
+        let durationMillis = Time.Duration.toMillis(dur);          
         x -> {
             let sep = Env.getFileSeparator();
             run {
@@ -599,10 +600,15 @@ pub mod Logger2 {
                     let st = now - startMillis;
                     let ver = st / durationMillis;
                     let path = "${dir}${sep}log${Int64.toString(ver)}.log";
-                    let output = "[${s} ${RichString.toPlainString(m)}]";
+                    let output = "[${s} ${RichString.toPlainString(m)}\n]";
                     let _ = Fs.FileWrite.append(str = output, path);
                     k()
                 }
             }
         }
+    ///
+    /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
+    ///
+    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, dir: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Env = 
+        handleWithScheduledFiles(startMillis, dur, dir, f)()
 }
