@@ -463,7 +463,8 @@ pub mod Logger2 {
     /// Handles the `Logger` effect, by returning a string instead.
     ///
     pub def runWithString(f: Unit -> a \ ef): String \ (ef - Logger) = handleWithString(f)()
-        
+    
+/* ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     ///
     /// Prepends a timestamp on every instance of `Logger.log`
     ///
@@ -476,7 +477,7 @@ pub mod Logger2 {
             Logger.log(s, output);
             k()
     }
-
+*/ //////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
     pub def withNoRepeats(f: Unit -> a \ ef): a \ ef + Logger = 
         region rc {
