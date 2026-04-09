@@ -313,6 +313,7 @@ pub mod Logger2 {
         } with handler Logger {
             def log(_s, _m, k) = k()
         }
+
     ///
     /// Middleware handler that prepends an emoji corresponding to the severity level
     ///
@@ -352,6 +353,9 @@ pub mod Logger2 {
                 k()
         }
 
+    ///
+    /// Handles the Logger effect with IO, while discarding all formatting
+    ///
     pub def handleWithNoFormatting(f: a -> b \ ef): a -> b \ ef - Logger + IO = 
         x -> run {
             f(x)
@@ -361,9 +365,15 @@ pub mod Logger2 {
                 k()
         }
 
+    ///
+    /// Runs the Logger effect with IO, while discarding all formatting
+    ///
     pub def runWithNoFormatting(f: Unit -> a \ ef): a \ ef - Logger + IO = 
         handleWithNoFormatting(f)() 
 
+    ///
+    /// Middleware for appending all available system-info to logs.
+    ///
     pub def handleWithEnvInfo(f: a -> b \ ef): a -> b \ ef + Logger + Sys.Env = 
         x -> run {
             f(x)
@@ -395,6 +405,9 @@ pub mod Logger2 {
                 k()
         }
 
+    ///
+    /// Middleware for appending all available system-info to logs.
+    ///
     pub def withEnvInfo(f: Unit -> b \ ef): b \ ef + Logger + Sys.Env = 
         handleWithEnvInfo(f)()
 
@@ -559,7 +572,10 @@ pub mod Logger2 {
             Logger.log(s, m)
         } with h1;
         loggingThread(h1, reciever)
-        
+    
+    ///
+    /// Middleware for removing repeated logs. Only lets each distinct (s, m)-pair be logged once.
+    ///
     pub def withNoRepeats(f: Unit -> a \ ef): a \ ef + Logger = 
         region rc {
             let r: Ref[List[(Severity, RichString)], rc] = Ref.fresh(rc, Nil);
