@@ -587,6 +587,8 @@ pub mod Logger2 {
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
     ///
+    /// The `path` controls directory, base name and extension of versioned log files.
+    ///
     pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
         let durationMillis = Time.Duration.toMillis(dur);
         x -> {
@@ -616,6 +618,8 @@ pub mod Logger2 {
         }
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
+    ///
+    /// The `path` controls directory, base name and extension of versioned log files.
     ///
     pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
         handleWithScheduledFiles(startMillis, dur, path, f)()
@@ -665,6 +669,8 @@ pub mod Logger2 {
         }
     ///
     /// Handles the `Logger` effect, by writing to a set of files, each with a max fileSize.
+    ///
+    /// The `path` controls directory, base name and extension of versioned log files.
     ///
     pub def runWithFileSizeRollover(max: Fs.Size, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env = handleWithFileSizeRollover(max, path, f)()
 }
