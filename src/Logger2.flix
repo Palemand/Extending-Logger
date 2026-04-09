@@ -151,6 +151,7 @@ pub mod Logger2 {
                 k()
         }
 
+    // could be renamed runWithIOPrint or smth
     pub def runWithIOButDifferentFromTheOtherRunWithIO(f: Unit -> a \ ef): a \ ef - Logger + IO = 
         run {
             f()
@@ -159,6 +160,16 @@ pub mod Logger2 {
                 let _ = println(m);
                 k()
         }
+
+    // wont work...
+    pub def ><(s1: a, s2: b): c -> String with ToString[a], ToString[b], ToString[c] = 
+        x -> "${s1}${x}${s2}"
+
+    pub def sev(st1: String, st2: String, s: Severity): RichString = 
+        RichString.text("${st1}${s}${st2}")
+
+    pub def msg(f: Severity -> RichString, st: String): Severity -> RichString -> RichString = 
+        s -> m -> RichString.text("${f(s)}${m}${st}")
 
     ///
     /// Aborts with the message `m` from `Logger.log` if given function `g` returns true.
