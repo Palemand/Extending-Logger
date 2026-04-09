@@ -542,7 +542,7 @@ pub mod Logger2 {
                 let output = "[${s}] ${RichString.toPlainString(m)}\n";
                 let res = Fs.FileWrite.append({str = output}, file);
                 match res {
-                    case Err(e) => Logger.warn("${e}")
+                    case Err(e) => /* Logger.log(s, m); */ Logger.warn("${e}")
                     case Ok() => ()
                 };
                 k()
