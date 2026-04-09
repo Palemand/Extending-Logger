@@ -27,4 +27,12 @@ mod TestMultiSink {
         } with h3
         with Logger.runWithIO;
         ()
+    
+    // @Test
+    // def runWithMultisink03(): Unit \ IO = 
+    //     let _ = run {
+    //         Logger.fatal("Hello, world")
+    //     } with Logger2.reraise(Logger2.blablaIO)
+    //     with Logger.runWithIO;
+    //     ()
 }

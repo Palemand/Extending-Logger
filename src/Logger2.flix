@@ -452,7 +452,7 @@ pub mod Logger2 {
     ///
     /// Handles the `Logger` effect, by batching multiples of the same log messages.
     ///
-    pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger + IO =
+    pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger =
         region rc {
             let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
             let n = Ref.fresh(rc, 0);
