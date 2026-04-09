@@ -673,4 +673,32 @@ pub mod Logger2 {
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
     pub def runWithFileSizeRollover(max: Fs.Size, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env = handleWithFileSizeRollover(max, path, f)()
+    /// Handles the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Reraises `Logger` to report errors encountered while writing. 
+    ///
+    pub def handleWithFileWriteLog(file: String, f: a -> b \ ef1): a -> b \ (ef1 - Logger) + Fs.FileWrite + Logger = 
+        x -> run {
+            f(x)
+        } with handler Logger {
+            def log(s, m, k) = {
+                let output = "[${s}] ${RichString.toPlainString(m)}\n";
+                let res = Fs.FileWrite.append({str = output}, file);
+                match res {
+                    case Err(e) => /* Logger.log(s, m); */ Logger.warn("${e}")
+                    case Ok() => ()
+                };
+                k()
+            }
+        }
+
+    ///
+    /// Handles the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Reraises `Logger` to report errors encountered while writing. 
+    ///
+    pub def runWithFileWriteLog(file: String, f: Unit -> a \ ef): a \ (ef - Logger) + Fs.FileWrite + Logger =
+        handleWithFileWriteLog(file, f)()
 }
