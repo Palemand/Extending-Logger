@@ -586,13 +586,20 @@ pub mod Logger2 {
 
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
-    /// User is responsible for creating directory.
     ///
-    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, dir: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env = 
+    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
         let durationMillis = Time.Duration.toMillis(dur);
         x -> {
             let sep = Env.getFileSeparator();
+            let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
+            let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
             let _ = Fs.MkDirs.mkDirs(dir);
+            println(split);
+            let file = split |> Option.getWithDefault(("", path)) |> snd;
+            let fileNameSplit = file |> String.findIndexOfRight(c -> c == '.') |> Option.map(o -> String.splitAt(o, file));
+            let fileBase = fileNameSplit |> Option.getWithDefault((file, "")) |> fst;
+            let fileExt = fileNameSplit |> Option.getWithDefault(("", "")) |> snd;
+            println("dir: ${dir}       fileBase: ${fileBase}      fileExt: ${fileExt}");
             run {
                 f(x)
             } with handler Logger {
@@ -600,37 +607,43 @@ pub mod Logger2 {
                     let now = Time.Clock.now();
                     let st = now - startMillis;
                     let ver = st / durationMillis;
-                    let path = "${dir}${sep}log${Int64.toString(ver)}.log";
+                    let newfile = "${dir}${sep}${fileBase}${ver}${fileExt}";
                     let output = "[${s}] ${RichString.toPlainString(m)}\n";
-                    let _ = Fs.FileWrite.append(str = output, path);
+                    let _ = Fs.FileWrite.append(str = output, newfile);
                     k()
                 }
             }
         }
     ///
     /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
-    /// User is responsible for creating directory.
     ///
-    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, dir: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env = 
-        handleWithScheduledFiles(startMillis, dur, dir, f)()
+    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
+        handleWithScheduledFiles(startMillis, dur, path, f)()
 
     ///
     /// Handles the `Logger` effect, by writing to a set of files, each with a max fileSize.
-    /// User is responsible for creating directory.
     ///
-    pub def handleWithFileSizeRollover(max: Fs.Size, dir: String, f: a -> b \ ef): (a -> b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env) = 
+    /// The `path` controls directory, base name and extension of versioned log files.
+    ///
+    pub def handleWithFileSizeRollover(max: Fs.Size, path: String, f: a -> b \ ef): (a -> b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env) = 
         x -> {
             region rc {
                 let iter = Ref.fresh(rc, 0);
                 let sep = Env.getFileSeparator();
+                let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
+                let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
                 let _ = Fs.MkDirs.mkDirs(dir);
+                let file = split |> Option.getWithDefault(("", path)) |> snd;
+                let fileNameSplit = file |> String.findIndexOfRight(c -> c == '.') |> Option.map(o -> String.splitAt(o, file));
+                let fileBase = fileNameSplit |> Option.getWithDefault((file, "")) |> fst;
+                let fileExt = fileNameSplit |> Option.getWithDefault(("", "")) |> snd;
                 run {
                     f(x)
                 } with handler Logger {
                     def log(s, m, k) = {
                         def loop() = {
                             let ver = Ref.get(iter);
-                            let curpath = "${dir}${sep}log${Int32.toString(ver)}.log";
+                            let curpath = "${dir}${fileBase}${Int32.toString(ver)}${fileExt}";
                             let curSize = Result.getWithDefault(Fs.Size.zero(), Fs.FileSize.size(curpath));
                             let over = curSize > max;
                             if (over) {
@@ -642,7 +655,7 @@ pub mod Logger2 {
                         };
                         loop();
                         let ver_ = Ref.get(iter);
-                        let path_ = "${dir}${sep}log${Int32.toString(ver_)}.log";
+                        let path_ = "${dir}${fileBase}${Int32.toString(ver_)}${fileExt}";
                         let output = "[${s}] ${RichString.toPlainString(m)}\n";
                         let _ = Fs.FileWrite.append(str = output, path_);
                         k()
@@ -652,7 +665,6 @@ pub mod Logger2 {
         }
     ///
     /// Handles the `Logger` effect, by writing to a set of files, each with a max fileSize.
-    /// User is responsible for creating directory.
     ///
-    pub def runWithFileSizeRollover(max: Fs.Size, dir: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env = handleWithFileSizeRollover(max, dir, f)()
+    pub def runWithFileSizeRollover(max: Fs.Size, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env = handleWithFileSizeRollover(max, path, f)()
 }
