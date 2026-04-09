@@ -6,6 +6,7 @@ def trySchedule(): Unit \ Fs.FileWrite + Time.Clock + Sys.Env + Time.Sleep + IO 
             Time.Sleep.sleep(Time.Duration.milliseconds(300))
         }
     } with Logger2.runWithScheduledFiles(Time.Clock.now(), Time.Duration.seconds(5), "schedules")
+    with Fs.MkDirs.runWithFileWrite
 }
 
 def tryFileSize(): Unit \ Sys.Env + Fs.FileWrite + Fs.FileStat = {
@@ -15,4 +16,5 @@ def tryFileSize(): Unit \ Sys.Env + Fs.FileWrite + Fs.FileStat = {
         }
     } with Logger2.runWithFileSizeRollover(Fs.Size.bytes(20i64), "sizes")
     with Fs.FileSize.runWithFileStat
+    with Fs.MkDirs.runWithFileWrite
 }
