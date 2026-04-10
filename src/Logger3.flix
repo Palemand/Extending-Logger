@@ -40,7 +40,7 @@ mod Logger3 {
                 k()
         }
 
-    def formatMessage(m: RichString, info: Logger3.Info): String = 
+    def formatMessage(m: RichString, info: Logger3.Info): String \ {IO} = 
         let Info({
             severity = sv,
             timestamp = ts,
@@ -48,15 +48,16 @@ mod Logger3 {
             format = fmt,
             other = ot
         }) = info;
+        let pref = "(?<!(?<!\\\\)\\\\)";
         let s = Map.foldLeftWithKey(acc -> reg -> v ->
-            String.replaceMatches(regex = reg, to = v, acc), 
-            fmt, ot 
-            |> Map.insert("%severity", "${sv}") 
+            let _ = println(pref + reg);
+            String.replaceMatches(regex = pref + reg, to = v, acc), 
+            fmt, 
+            ot |> Map.insert("%severity", "${sv}") 
             |> Map.insert("%timestamp", "${Option.getWithDefault("None", ts)}")
             |> Map.insert("%sysInfo", "${if (Map.isEmpty(si)) "None" else "${si}"}")
-            |> Map.insert("%msg", "${m}")
         );
-        s
+        String.replaceMatches(regex = pref + "%msg", to = "${m}", s)
 
     pub def withTimestamp(f: Unit -> a \ ef): a \ ef + Logger3 + Timestamp = 
         run {
@@ -64,7 +65,7 @@ mod Logger3 {
         } with handler Logger3 {
             def log(info, m, k) = 
                 let Info(i) = info;
-                let info_ = Info.Info({timestamp = Some(Timestamp.getTimestamp()) | i});
+                let info_ = Info({timestamp = Some(Timestamp.getTimestamp()) | i});
                 Logger3.log(info_, m);
                 k()
         }
@@ -82,26 +83,41 @@ mod Logger3 {
                 k()
         }
 
-    pub def fatal(s: String): Unit \ Logger3 = 
+    def logSeverity(s: Severity, m: String): Unit \ Logger3 = 
         let i = Info({
-            severity = Severity.Fatal, 
+            severity = s, 
             timestamp = None,
             sysInfo = Map.empty(),
             format = defaultFormat(),
             other = Map.empty()
-            });
-        Logger3.log(i, RichString.text(s))
+        });
+        Logger3.log(i, RichString.text(m))
 
-    pub def toOldLogger(f: Unit -> a \ ef): a \ (ef - Logger3) + Logger =
-        run {
-            f()
-        } with handler Logger3 {
-            def log(info, m, k) = 
-                let Info({severity = s | _}) = info;
-                let m_ = formatMessage(m, info);
-                Logger.log(s, RichString.text(m_));
-                k()
-        }
+    pub def trace(m: String): Unit \ Logger3 = 
+        logSeverity(Severity.Trace, m)
+
+    pub def debug(m: String): Unit \ Logger3 = 
+        logSeverity(Severity.Debug, m)
+
+    pub def info(m: String): Unit \ Logger3 = 
+        logSeverity(Severity.Info, m)
+
+    pub def warn(m: String): Unit \ Logger3 = 
+        logSeverity(Severity.Warn, m)
+
+    pub def fatal(m: String): Unit \ Logger3 = 
+        logSeverity(Severity.Fatal, m)
+
+    // pub def toOldLogger(f: Unit -> a \ ef): a \ (ef - Logger3) + Logger =
+    //     run {
+    //         f()
+    //     } with handler Logger3 {
+    //         def log(info, m, k) = 
+    //             let Info({severity = s | _}) = info;
+    //             let m_ = formatMessage(m, info);
+    //             Logger.log(s, RichString.text(m_));
+    //             k()
+    //     }
 
     def defaultFormat(): String = 
         "[%severity] %msg"
@@ -171,7 +187,7 @@ mod Logger3 {
         } 
 
     def syslogFormat(): String = 
-        "<%priority> %timestamp %hostname %application[%pid]: %msg"
+        "<%priority>%timestamp %hostname %application[%pid]: %msg"
 
     pub def withRichSeverity(f: Unit -> a \ ef): a \ ef + Logger3 = 
         run {
