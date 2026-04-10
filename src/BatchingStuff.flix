@@ -1,17 +1,17 @@
 use Severity.Info
 use RichString.RichString
 use RichString.Span
-def tryBatching(): Unit \ IO =
-    if (true) {(println(""))};
-    run {
-        Logger.info("Hej");
-        Logger.info("Hej");
-        Logger.info("Hej");
-        Logger.info("Hej");
-        Logger.info("Hej");
-        Logger.info("Hej med dig")
-    } with Logger2.withBatching
-    with Logger.runWithIO
+// def tryBatching(): Unit \ IO =
+//     if (true) {(println(""))};
+//     run {
+//         Logger.info("Hej");
+//         Logger.info("Hej");
+//         Logger.info("Hej");
+//         Logger.info("Hej");
+//         Logger.info("Hej");
+//         Logger.info("Hej med dig")
+//     } with Logger2.withBatching
+//     with Logger.runWithIO
 
 
     ///

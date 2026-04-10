@@ -452,42 +452,42 @@ pub mod Logger2 {
     ///
     /// Handles the `Logger` effect, by batching multiples of the same log messages.
     ///
-    pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger =
-        region rc {
-            let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
-            let n = Ref.fresh(rc, 0);
-            run {
-                f()
-            } with handler Logger {
-                def log(s, m, k) = {
-                    let (ls, lm) = Ref.get(last);
-                    let cmp = s == ls and equals(m, lm);
-                    let count = Ref.get(n);
-                    match (cmp, count) {
-                        case (_, 0) => {
-                            Ref.put(1, n);
-                            Ref.put((s, m), last);
-                            Logger.log(s, m)
-                        }
-                        case (true, _) => {
-                            Ref.put(count + 1, n)
-                        }
-                        case (_) if (count == 1) => {
-                            Ref.put(1, n);
-                            Ref.put((s, m), last);
-                            Logger.log(s, m)
-                        }
-                        case _ => {
-                            Logger.log(Info, RichString.fromString("-- Repeated ${count-1}X times --"));
-                            Ref.put(1, n);
-                            Ref.put((s, m), last);
-                            Logger.log(s, m)
-                        }
-                    };
-                    k()
-                }
-            }
-        }
+    // pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger =
+    //     region rc {
+    //         let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
+    //         let n = Ref.fresh(rc, 0);
+    //         run {
+    //             f()
+    //         } with handler Logger {
+    //             def log(s, m, k) = {
+    //                 let (ls, lm) = Ref.get(last);
+    //                 let cmp = s == ls and equals(m, lm);
+    //                 let count = Ref.get(n);
+    //                 match (cmp, count) {
+    //                     case (_, 0) => {
+    //                         Ref.put(1, n);
+    //                         Ref.put((s, m), last);
+    //                         Logger.log(s, m)
+    //                     }
+    //                     case (true, _) => {
+    //                         Ref.put(count + 1, n)
+    //                     }
+    //                     case (_) if (count == 1) => {
+    //                         Ref.put(1, n);
+    //                         Ref.put((s, m), last);
+    //                         Logger.log(s, m)
+    //                     }
+    //                     case _ => {
+    //                         Logger.log(Info, RichString.fromString("-- Repeated ${count-1}X times --"));
+    //                         Ref.put(1, n);
+    //                         Ref.put((s, m), last);
+    //                         Logger.log(s, m)
+    //                     }
+    //                 };
+    //                 k()
+    //             }
+    //         }
+    //     }
     ///
     /// Handles the `Logger` effect, by returning a string instead.
     ///
