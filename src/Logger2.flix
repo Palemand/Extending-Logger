@@ -601,41 +601,20 @@ pub mod Logger2 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def handleWithFileSizeRollover(max: Fs.Size, path: String, f: a -> b \ ef): (a -> b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env) = 
+    pub def handleWithFileSizeRollover(max: Fs.Size, maxFiles: Int32, path: String, f: a -> b \ ef): (a -> b \ (ef - Logger) + Fs.FileWrite + Fs.FileStat + Fs.MkDirs + Env) = 
         x -> {
-            region rc {
-                let iter = Ref.fresh(rc, 0);
-                let sep = Env.getFileSeparator();
-                let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
-                let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
-                let _ = Fs.MkDirs.mkDirs(dir);
-                let file = split |> Option.getWithDefault(("", path)) |> snd;
-                let fileNameSplit = file |> String.findIndexOfRight(c -> c == '.') |> Option.map(o -> String.splitAt(o, file));
-                let fileBase = fileNameSplit |> Option.getWithDefault((file, "")) |> fst;
-                let fileExt = fileNameSplit |> Option.getWithDefault(("", "")) |> snd;
-                run {
-                    f(x)
-                } with handler Logger {
-                    def log(s, m, k) = {
-                        def loop() = {
-                            let ver = Ref.get(iter);
-                            let curpath = "${dir}${fileBase}${Int32.toString(ver)}${fileExt}";
-                            let curSize = Result.getWithDefault(Fs.Size.zero(), Fs.FileSize.size(curpath));
-                            let over = curSize > max;
-                            if (over) {
-                                Ref.put(Ref.get(iter) + 1, iter);
-                                loop()
-                            } else {
-                                ()
-                            }
-                        };
-                        loop();
-                        let ver_ = Ref.get(iter);
-                        let path_ = "${dir}${fileBase}${Int32.toString(ver_)}${fileExt}";
-                        let output = "[${s}] ${RichString.toPlainString(m)}\n";
-                        let _ = Fs.FileWrite.append(str = output, path_);
-                        k()
-                    }
+            let sep = Env.getFileSeparator();
+            let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
+            let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
+            let _ = Fs.MkDirs.mkDirs(dir);
+            run {
+                f(x)
+            } with handler Logger {
+                def log(s, m, k) = {
+                    let _ = run {
+                        Fs.FileWrite.append(str = "[${s}] ${RichString.toPlainString(m)}\n", path)
+                    } with Fs.FileWrite.withSizeRotation(max, maxFiles);
+                    k()
                 }
             }
         }
@@ -644,7 +623,7 @@ pub mod Logger2 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def runWithFileSizeRollover(max: Fs.Size, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileSize + Fs.FileWrite + Fs.MkDirs + Env = handleWithFileSizeRollover(max, path, f)()
+    pub def runWithFileSizeRollover(max: Fs.Size, maxFiles: Int32, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Fs.FileWrite + Fs.FileStat + Fs.MkDirs + Env = handleWithFileSizeRollover(max, maxFiles, path, f)()
     /// Handles the `Logger` effect of the given function `f`. Appends the logged to `file`.
     ///
     /// Discards style from the logged messages. 
