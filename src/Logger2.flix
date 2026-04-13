@@ -1,4 +1,5 @@
 pub mod Logger2 {
+    use Group.empty
     use Sys.Console.print
     use Logger2.handleWithNoFormatting
     use Net.TcpSocket
@@ -534,23 +535,17 @@ pub mod Logger2 {
     ///
     pub def withNoRepeats(f: Unit -> a \ ef): a \ ef + Logger = 
         region rc {
-            let r: Ref[List[(Severity, RichString)], rc] = Ref.fresh(rc, Nil);
+            let r: Ref[Set[(Severity, String)], rc] = Ref.fresh(rc, Set.empty());
             run {
                 f()
             } with handler Logger {
                 def log(s, m, k) = 
-                    let last = Ref.get(r);
-                    match last {
-                        case Nil => 
-                            Logger.log(s, m);
-                            Ref.put((s, m) :: Nil, r)
-                        case xs => 
-                            if (List.memberOf((s, m), xs)) {
-                                ()
-                            } else {
-                                Logger.log(s, m);
-                                Ref.put((s, m) :: xs, r)
-                            }
+                    let m_str = RichString.toString(m);
+                    let seen = Ref.get(r);
+
+                    if (not Set.memberOf((s,m_str), seen)) {
+                        Logger.log(s, m);
+                        Ref.put(Set.insert((s,m_str), seen), r)
                     };
                     k()
             }
