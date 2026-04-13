@@ -717,4 +717,22 @@ pub mod Logger2 {
     ///
     pub def runWithFileWriteLog(file: String, f: Unit -> a \ ef): a \ (ef - Logger) + Fs.FileWrite + Logger =
         handleWithFileWriteLog(file, f)()
+
+    ///
+    /// A wrapper for a terminal handler of the `Logger` effect.
+    /// Creates a handler that handles `Logger` with handler `h`,
+    /// and then reraises the effect.
+    ///
+    pub def reraise(h: (Unit -> Unit \ Logger) -> x \ ef1, f: Unit -> a \ ef2): a \ ef1 + ef2 + Logger = 
+        run {
+            f()
+        } with handler Logger {
+            def log(s, m, k) = 
+                let _ = run {
+                    Logger.log(s, m)
+                } with h;
+                Logger.log(s, m);
+                k()
+        }
+        
 }
