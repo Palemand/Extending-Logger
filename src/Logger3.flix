@@ -40,7 +40,7 @@ mod Logger3 {
                 k()
         }
 
-    def formatMessage(m: RichString, info: Logger3.Info): String \ {IO} = 
+    def formatMessage(m: RichString, info: Logger3.Info): String \ {} = 
         let Info({
             severity = sv,
             timestamp = ts,
@@ -50,11 +50,11 @@ mod Logger3 {
         }) = info;
         let pref = "(?<!(?<!\\\\)\\\\)";
         let s = Map.foldLeftWithKey(acc -> reg -> v ->
-            let _ = println(pref + reg);
+            //Regex.replace(src = reg, dst = v, acc),
             String.replaceMatches(regex = pref + reg, to = v, acc), 
             fmt, 
-            ot |> Map.insert("%severity", "${sv}") 
-            |> Map.insert("%timestamp", "${Option.getWithDefault("None", ts)}")
+            ot |> Map.insert("%severity", "${sv}")
+            |> Map.insert("%timestamp", "${Option.getWithDefault("", ts)}")
             |> Map.insert("%sysInfo", "${if (Map.isEmpty(si)) "None" else "${si}"}")
         );
         String.replaceMatches(regex = pref + "%msg", to = "${m}", s)
@@ -108,43 +108,54 @@ mod Logger3 {
     pub def fatal(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Fatal, m)
 
-    // pub def toOldLogger(f: Unit -> a \ ef): a \ (ef - Logger3) + Logger =
-    //     run {
-    //         f()
-    //     } with handler Logger3 {
-    //         def log(info, m, k) = 
-    //             let Info({severity = s | _}) = info;
-    //             let m_ = formatMessage(m, info);
-    //             Logger.log(s, RichString.text(m_));
-    //             k()
-    //     }
-
-    def defaultFormat(): String = 
-        "[%severity] %msg"
-
-    pub def withCommonLogFormat(ip: Net.IpAddr, name: String, status: Int32, size: Int32, f: Unit -> a \ ef): a \ ef + Logger3 + Timestamp = 
+    pub def withOldLogger(f: Unit -> a \ ef): a \ (ef - Logger3) + Logger =
         run {
             f()
         } with handler Logger3 {
             def log(info, m, k) = 
-                let Info({other = old, timestamp = timestamp | _}) = info;
-                let ip_ = match ip {
-                    case IpAddr.V4(i) => "${i}"
-                    case IpAddr.V6(i) => "${i}"
-                };
-                let ts = match timestamp {
-                    case None => Some(Timestamp.getTimestamp())
-                    case Some(t) => Some(t)
-                };
-                let other = Map#{
-                    "%ip" => "${ip_}",
-                    "%name" => name,
-                    "%status" => "${status}",
-                    "%size" => "${size}"
-                };
+                let Info({severity = s | _}) = info;
+                let m_ = formatMessage(m, info);
+                Logger.log(s, RichString.text(m_));
+                k()
+        }
+
+    def defaultFormat(): String = 
+        "%timestamp[%severity] %msg"
+
+    // maybe not
+    pub def logHttpRequest(res: Net.HttpResponse, socket: Net.TcpSocket): Unit \ Logger3 + Timestamp + IO + Abort = 
+        let Net.TcpSocket.TcpSocket(s, _, _) = socket;
+        let ips = s.getInetAddress().toString();
+        let ip = Option.getOrAbort(Net.IpAddr.fromString(ips));
+        Logger3.logCommonLog(ip, "-", "msg", Net.HttpResponse., 2326, None)
+
+    pub def logCommonLog(ip: Net.IpAddr, name: String, message: String, status: Int32, size: Int32, s: Option[Severity]): Unit \ Logger3 + Timestamp = 
+        let ip_ = match ip {
+            case IpAddr.V4(i) => "${i}"
+            case IpAddr.V6(i) => "${i}"
+        };
+        let other = Map#{
+            "%ip" => "${ip_}",
+            "%name" => name,
+            "%status" => "${status}",
+            "%size" => "${size}"
+        };
+        let info = Info({
+            severity = Option.getWithDefault(Severity.Info, s), 
+            timestamp = Some(Timestamp.getTimestamp()),
+            sysInfo = Map.empty(),
+            format = commonLogFormat(),
+            other = other
+        });
+        Logger3.log(info, RichString.text(message))
+
+    pub def withCommonLogFormat(f: Unit -> a \ ef): a \ ef + Logger3 = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(info, m, k) = 
                 let Info(i) = info;
-                let n = Map.union(other, old);
-                let info_ = (Info({other = n, format = commonLogFormat(), timestamp = ts | i}));
+                let info_ = Info({format = commonLogFormat() | i});
                 Logger3.log(info_, m);
                 k()
         }
