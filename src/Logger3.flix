@@ -120,14 +120,7 @@ mod Logger3 {
         }
 
     def defaultFormat(): String = 
-        "%timestamp[%severity] %msg"
-
-    // maybe not
-    pub def logHttpRequest(res: Net.HttpResponse, socket: Net.TcpSocket): Unit \ Logger3 + Timestamp + IO + Abort = 
-        let Net.TcpSocket.TcpSocket(s, _, _) = socket;
-        let ips = s.getInetAddress().toString();
-        let ip = Option.getOrAbort(Net.IpAddr.fromString(ips));
-        Logger3.logCommonLog(ip, "-", "msg", Net.HttpResponse., 2326, None)
+        "%timestamp[%severity] %msg %sysInfo"
 
     pub def logCommonLog(ip: Net.IpAddr, name: String, message: String, status: Int32, size: Int32, s: Option[Severity]): Unit \ Logger3 + Timestamp = 
         let ip_ = match ip {
