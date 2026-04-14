@@ -452,6 +452,7 @@ pub mod Logger2 {
     ///
     /// Handles the `Logger` effect, by batching multiples of the same log messages.
     ///
+    @Deprecated
     pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger =
         region rc {
             let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
@@ -505,6 +506,7 @@ pub mod Logger2 {
     ///
     /// Spawns a seperate thread for doing the logging.
     ///
+    @Deprecated
     pub def withThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan)) -> a \ IO + NonDet + Chan, f: Unit -> a \ ef ): a \ (ef - Logger) + Chan + NonDet + IO =
         region rc {
             let (tx, rx) = Channel.unbuffered();
@@ -522,6 +524,7 @@ pub mod Logger2 {
     ///
     /// Helper function for `withThread` doing the logging 
     ///
+    @Deprecated
     def loggingThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan)) -> a \ IO + NonDet + Chan , reciever: Receiver[(Severity, RichString)]): Unit \ IO + NonDet + Chan =
         let _x = run {
             let (s, m) = Channel.recv(reciever);
@@ -530,7 +533,9 @@ pub mod Logger2 {
         loggingThread(h1, reciever)
     
     ///
-    /// Spawns a seperate thread for doing the logging.
+    /// Terminating handler for the `Logger` effect, that will batch multiples of the same log messages that are sent within `timeout` of each other.
+    ///
+    /// Uses a seperate thread for handling the batching. 
     ///
     pub def withBatchingThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, timeout: Time.Duration, f: Unit -> a \ ef ): a \ (ef - Logger) + Chan + NonDet + IO =
         region rc {
