@@ -1,17 +1,17 @@
 use Severity.Info
 use RichString.RichString
 use RichString.Span
-def tryBatching(): Unit \ IO =
-    if (true) {(println(""))};
+def tryBatching(): Unit \ Chan + IO + NonDet =
     run {
         Logger.info("Hej");
         Logger.info("Hej");
+        Logger.info("Hej med dig");
+        Logger.info("Hej med dig");
+        Logger.info("Hej med dig");
         Logger.info("Hej");
         Logger.info("Hej");
-        Logger.info("Hej");
-        Logger.info("Hej med dig")
-    } with Logger2.withBatching
-    with Logger.runWithIO
+        Logger.info("Hej")
+    } with Logger2.withBatchingThread(Logger.runWithIO, Time.Duration.milliseconds(10))
 
 
     ///

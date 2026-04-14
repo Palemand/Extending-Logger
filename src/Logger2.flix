@@ -530,6 +530,84 @@ pub mod Logger2 {
         loggingThread(h1, reciever)
     
     ///
+    /// Spawns a seperate thread for doing the logging.
+    ///
+    pub def withBatchingThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, timeout: Time.Duration, f: Unit -> a \ ef ): a \ (ef - Logger) + Chan + NonDet + IO =
+        region rc {
+            let (tx, rx) = Channel.unbuffered();
+            let (closetx, closerx) = Channel.unbuffered();
+            spawn batchingThread(h1, timeout, rx, closerx) @ rc;
+            run {
+                let res = f();
+                Channel.send((), closetx);
+                res
+            } with handler Logger {
+                def log(s, m, k) = {
+                    Channel.send((s, m), tx);
+                    k()
+                }
+            }
+        }
+        
+    ///
+    /// Helper function for `withBatchingThread` doing the logging 
+    ///
+    def batchingThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, timeout: Time.Duration, reciever: Receiver[(Severity, RichString)], closer: Receiver[Unit]): Unit \ IO + NonDet + Chan =
+        run {
+            let timeoutms = Time.Duration.toMillis(timeout) |> Int64.clampToInt32(min = 0, max = Int32.maxValue());
+            region rc {
+                let batch = Ref.fresh(rc, List.empty());
+                let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
+                let times = Ref.fresh(rc, 0);
+                let endBatching = Ref.fresh(rc, false);
+                def loop() = {
+                    let chanTimeout = Channel.timeout(timeoutms, Time.TimeUnit.Milliseconds);
+                    select {
+                        case pair <- Channel.recv(reciever) => {
+                            let (s, m) = pair;
+                            Ref.transform((xs) -> (s, m) :: xs, batch)
+                        }
+                        case _ <- Channel.recv(chanTimeout) => {
+                            let logs = Ref.get(batch);
+                            Ref.put(List.empty(), batch);
+                            logs |> List.reverse |> List.forEach(match (s, m) -> {
+                                let it = Ref.get(times);
+                                let (ls, lm) = Ref.get(last);
+                                let eq = s == ls and equals(m, lm);
+                                if (it == 0) {
+                                    Ref.put((s, m), last);
+                                    Ref.put(it + 1, times);
+                                    Logger.log(s, m)
+                                } else if (eq) {
+                                    Ref.put(it + 1, times)
+                                } else if (it == 1) {
+                                    Ref.put((s, m), last);
+                                    Logger.log(s, m)
+                                } else {
+                                    Logger.log(Info, RichString.fromString("-- Repeated ${it}X times --"));
+                                    Ref.put((s, m), last);
+                                    Logger.log(s, m);
+                                    Ref.put(1, times)
+                                }
+                            });
+                            if (Ref.get(times) > 1) {
+                                Logger.log(Info, RichString.fromString("-- Repeated ${Ref.get(times)}X times --"))
+                            };
+                            Ref.put(0, times)
+                        }
+                        case _ <- Channel.recv(closer) => {
+                            Ref.put(true, endBatching)
+                        }
+                    };
+                    if (not List.isEmpty(Ref.get(batch)) or not Ref.get(endBatching)) {
+                        loop()
+                    }
+                };
+                loop()
+            }
+        } with h1
+    
+    ///
     /// Middleware for removing repeated logs. Only lets each distinct (s, m)-pair be logged once.
     ///
     pub def withNoRepeats(f: Unit -> a \ ef): a \ ef + Logger = 
@@ -568,12 +646,10 @@ pub mod Logger2 {
             let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
             let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
             let _ = Fs.MkDirs.mkDirs(dir);
-            println(split);
             let file = split |> Option.getWithDefault(("", path)) |> snd;
             let fileNameSplit = file |> String.findIndexOfRight(c -> c == '.') |> Option.map(o -> String.splitAt(o, file));
             let fileBase = fileNameSplit |> Option.getWithDefault((file, "")) |> fst;
             let fileExt = fileNameSplit |> Option.getWithDefault(("", "")) |> snd;
-            println("dir: ${dir}       fileBase: ${fileBase}      fileExt: ${fileExt}");
             run {
                 f(x)
             } with handler Logger {
