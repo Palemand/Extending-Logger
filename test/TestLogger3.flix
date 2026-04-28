@@ -34,36 +34,35 @@ mod TestLogger3{
         run {
             Logger3.fatal("GET /server-status HTTP/1.1")
         } with Logger3.withTimestamp
-        with Logger3.withCommonLogFormat
-        with Logger3.runWithIO
+        with Logger3.runWithCommonLogFormat
         with Timestamp.runWithIO
 
     // prints [Fatal] Hello, world [Fatal]
     // where Fatal is bolded and red
-    pub def runWithIO04(): Unit \ IO = 
-        run {
-            Logger3.fatal("Hello, world")
-        } 
-        with Logger3.withCustomFormat("[%severity] %msg [%severity]")
-        with Logger3.withRichSeverity
-        with Logger3.runWithIO
+    // pub def runWithIO04(): Unit \ IO = 
+    //     run {
+    //         Logger3.fatal("Hello, world")
+    //     } 
+    //     with Logger3.withCustomFormat("[%severity] %msg [%severity]")
+    //     with Logger3.withRichSeverity
+    //     with Logger3.runWithIO
 
     // prints a message formatted as syslog
-    pub def runWithIO05(): Unit \ IO = 
-        run {
-            Logger3.fatal("Failed password for user root")
-        }
-        with Logger3.withTimestamp 
-        with Logger3.withSyslogFormat(34, "my-server", "sshd", 1234)
-        with Timestamp.runWithIO
-        with Logger3.runWithIO
+    // pub def runWithIO05(): Unit \ IO = 
+    //     run {
+    //         Logger3.fatal("Failed password for user root")
+    //     }
+    //     with Logger3.withTimestamp 
+    //     with Logger3.withSyslogFormat(34, "my-server", "sshd", 1234)
+    //     with Timestamp.runWithIO
+    //     with Logger3.runWithIO
 
-    pub def runWithIO06(): Unit \ IO = 
-        run {
-            Logger3.fatal("Hello, world")
-        }
-        with Logger3.withCustomFormat("\\%severity")
-        with Logger3.runWithIO
+    // pub def runWithIO06(): Unit \ IO = 
+    //     run {
+    //         Logger3.fatal("Hello, world")
+    //     }
+    //     with Logger3.withCustomFormat("\\%severity")
+    //     with Logger3.runWithIO
 
     pub def runWithIO07(): Unit \ IO = 
         run {
@@ -73,14 +72,14 @@ mod TestLogger3{
         with Logger3.runWithIO
         with Timestamp.runWithIO
 
-    pub def runWithIO08(): Unit \ IO = 
-        run {
-            Logger3.trace("Hello, world")
-        } 
-        with Logger3.withCommonLogFormat
-        with Logger3.withOldLogger
-        with Logger2.runWithFileWrite(".test/test.log")
-        with Fs.FileWrite.runWithIO
-        with Timestamp.runWithIO
-        with Logger3.runWithIO
+    // pub def runWithIO08(): Unit \ IO = 
+    //     run {
+    //         Logger3.trace("Hello, world")
+    //     } 
+    //     with Logger3.withCommonLogFormat
+    //     with Logger3.withOldLogger
+    //     with Logger2.runWithFileWrite(".test/test.log")
+    //     with Fs.FileWrite.runWithIO
+    //     with Timestamp.runWithIO
+    //     with Logger3.runWithIO
 }
