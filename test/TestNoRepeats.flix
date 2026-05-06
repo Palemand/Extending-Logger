@@ -1,4 +1,5 @@
 mod TestNoRepeats {
+    use Logger.Severity
     @Test
     def withNoRepeats01(): Unit \ Assert = 
         let (_, l) = run {

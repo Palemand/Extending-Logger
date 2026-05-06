@@ -1,4 +1,4 @@
-use Severity.Info
+use Logger.Severity.Info
 use RichString.RichString
 use RichString.Span
 // def tryBatching(): Unit \ IO =

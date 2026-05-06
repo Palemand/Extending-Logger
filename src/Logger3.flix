@@ -6,6 +6,7 @@ mod Logger3 {
     use Net.IpAddr
     use Info.Info
     use RichString.{gray, cyan, green, yellow, red, bold, text};
+    use Logger.Severity
 
     /**
     TODO:

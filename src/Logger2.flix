@@ -4,7 +4,8 @@ pub mod Logger2 {
     use Net.TcpSocket
     use Sys.{Console, Env}
     use RichString.{gray, cyan, green, yellow, red, bold, text};
-    use Severity.{Warn, Fatal, Trace, Debug, Info}
+    use Logger.Severity.{Warn, Fatal, Trace, Debug, Info}
+    use Logger.Severity
 
     ///
     /// Logs the message `m` at the `Trace` level.
