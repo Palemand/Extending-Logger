@@ -9,6 +9,9 @@ mod Logger3 {
     use Logger.Severity
     use Logger3.LogRecord.LogRecord
 
+    ///
+    /// Enum that keeps track of information in a logrecord.
+    ///
     pub enum LogRecord ({
         message = RichString,
         severity = Logger.Severity, 
@@ -16,6 +19,11 @@ mod Logger3 {
         aux = Map[String, String]
     })
 
+    ///
+    /// Runs the `Logger` effect of the given function `f`.
+    ///
+    /// In other words, re-interprets the `Logger` effect using the `IO` effect.
+    ///
     @DefaultHandler
     pub def runWithIO(f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
         run {
@@ -26,7 +34,9 @@ mod Logger3 {
                 println(rs);
                 k()
         }
-    
+    ///
+    /// Runs the `Logger` effect of the given function `f`, with a specified format.
+    ///
     pub def runWithIOFmt(fmt: String, f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
         run {
             f()
@@ -52,7 +62,11 @@ mod Logger3 {
             |> Map.insert("%timestamp", "${Option.getWithDefault("", ts)}")
         );
         String.replaceMatches(regex = pref + "%msg", to = "${msg}", s)
-
+    ///
+    /// Middleware handler that attaches a timestamp from whenever the handler is invoked.
+    ///
+    /// Raises the Timestamp effect.
+    ///
     pub def withTimestamp(f: Unit -> a \ ef): a \ ef + Logger3 + Timestamp = 
         run {
             f()
@@ -64,6 +78,9 @@ mod Logger3 {
                 k()
         }
 
+    ///
+    /// Middleware handler that attaches auxillery information to the log record.
+    ///
     pub def withAux(aux: Map[String, String], f: Unit -> a \ ef): a \ ef + Logger3 = 
         run {
             f()
@@ -85,36 +102,39 @@ mod Logger3 {
             aux = Map.empty()
         });
         Logger3.log(i)
-
+    ///
+    /// Logs the message `m` at the `Trace` level.
+    ///
     pub def trace(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Trace, m)
-
+    ///
+    /// Logs the message `m` at the `Debug` level.
+    ///
     pub def debug(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Debug, m)
-
+    ///
+    /// Logs the message `m` at the `Info` level.
+    ///
     pub def info(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Info, m)
-
+    ///
+    /// Logs the message `m` at the `Warn` level.
+    ///
     pub def warn(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Warn, m)
-
+    ///
+    /// Logs the message `m` at the `Fatal` level.
+    ///
     pub def fatal(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Fatal, m)
-
-    pub def withOldLogger(f: Unit -> a \ ef): a \ (ef - Logger3) + Logger =
-        run {
-            f()
-        } with handler Logger3 {
-            def log(r, k) = 
-                let LogRecord({severity = s | _}) = r;
-                let m_ = formatMessage(defaultFormat(), r);
-                Logger.log(s, RichString.text(m_));
-                k()
-        }
-
+    ///
+    /// Default format for log events.
+    ///
     pub def defaultFormat(): String = 
         "%timestamp[%severity] %msg"
-
+    ///
+    /// Logs an event given all the auxillery information to fulfill the commonlog format.
+    ///
     pub def logCommonLog(ip: Net.IpAddr, name: String, message: String, status: Int32, size: Int32, s: Option[Severity]): Unit \ Logger3 + Timestamp = 
         let ip_ = match ip {
             case IpAddr.V4(i) => "${i}"
@@ -133,16 +153,24 @@ mod Logger3 {
             aux = other
         });
         Logger3.log(r)
-
+    ///
+    /// IO handler that uses the commonlog format.
+    ///
     pub def runWithCommonLogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO = 
         runWithIOFmt(commonLogFormat(), f)
-
+    ///
+    /// Commonlog format.
+    ///
     pub def commonLogFormat(): String = 
         "%ip - %name [%timestamp] \"%msg\" %status %size"
-
+    ///
+    /// Syslog format.
+    ///
     pub def syslogFormat(): String = 
         "<%priority>%timestamp %hostname %application[%pid]: %msg"
-
+    ///
+    /// IO handler that uses the syslog format.
+    ///
     pub def runWithSyslogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
         runWithIOFmt(syslogFormat(), f)
 }
