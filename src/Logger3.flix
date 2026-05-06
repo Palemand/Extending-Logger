@@ -3,6 +3,7 @@ eff Logger3 {
 }
 
 mod Logger3 {
+    import java.lang.ProcessHandle;
     use Net.IpAddr
     use RichString.{gray, cyan, green, yellow, red, bold, text};
     use Logger.Severity
@@ -111,8 +112,8 @@ mod Logger3 {
                 k()
         }
 
-    def defaultFormat(): String = 
-        "%timestamp[%severity] %msg %sysInfo"
+    pub def defaultFormat(): String = 
+        "%timestamp[%severity] %msg"
 
     pub def logCommonLog(ip: Net.IpAddr, name: String, message: String, status: Int32, size: Int32, s: Option[Severity]): Unit \ Logger3 + Timestamp = 
         let ip_ = match ip {
@@ -136,10 +137,10 @@ mod Logger3 {
     pub def runWithCommonLogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO = 
         runWithIOFmt(commonLogFormat(), f)
 
-    def commonLogFormat(): String = 
+    pub def commonLogFormat(): String = 
         "%ip - %name [%timestamp] \"%msg\" %status %size"
-    
-    def syslogFormat(): String = 
+
+    pub def syslogFormat(): String = 
         "<%priority>%timestamp %hostname %application[%pid]: %msg"
 
     pub def runWithSyslogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
