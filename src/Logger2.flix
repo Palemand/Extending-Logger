@@ -4,7 +4,8 @@ pub mod Logger2 {
     use Net.TcpSocket
     use Sys.{Console, Env}
     use RichString.{gray, cyan, green, yellow, red, bold, text};
-    use Severity.{Warn, Fatal, Trace, Debug, Info}
+    use Logger.Severity.{Warn, Fatal, Trace, Debug, Info}
+    use Logger.Severity
 
     ///
     /// Logs the message `m` at the `Trace` level.
@@ -452,6 +453,67 @@ pub mod Logger2 {
     ///
     /// Handles the `Logger` effect, by batching multiples of the same log messages.
     ///
+    // pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger =
+    //     region rc {
+    //         let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
+    //         let n = Ref.fresh(rc, 0);
+    //         run {
+    //             f()
+    //         } with handler Logger {
+    //             def log(s, m, k) = {
+    //                 let (ls, lm) = Ref.get(last);
+    //                 let cmp = s == ls and equals(m, lm);
+    //                 let count = Ref.get(n);
+    //                 match (cmp, count) {
+    //                     case (_, 0) => {
+    //                         Ref.put(1, n);
+    //                         Ref.put((s, m), last);
+    //                         Logger.log(s, m)
+    //                     }
+    //                     case (true, _) => {
+    //                         Ref.put(count + 1, n)
+    //                     }
+    //                     case (_) if (count == 1) => {
+    //                         Ref.put(1, n);
+    //                         Ref.put((s, m), last);
+    //                         Logger.log(s, m)
+    //                     }
+    //                     case _ => {
+    //                         Logger.log(Info, RichString.fromString("-- Repeated ${count-1}X times --"));
+    //                         Ref.put(1, n);
+    //                         Ref.put((s, m), last);
+    //                         Logger.log(s, m)
+    //                     }
+    //                 };
+    //                 k()
+    //             }
+    //         }
+    //     }
+    ///
+    /// Handles the `Logger` effect, by returning a string instead.
+    ///
+    pub def handleWithRichString(f: a -> b \ ef): a -> RichString \ (ef - Logger) = 
+        x -> run {
+            let _ = f(x); RichString.fromString("")
+        } with handler Logger {
+            def log(s, m, k) = {
+                let prefix = match s {
+                    case Severity.Debug => cyan("[Debug]")
+                    case Severity.Fatal => bold(red("[Fatal]"))
+                    case Severity.Info  => green("[Info]")
+                    case Severity.Trace => gray("[Trace]")
+                    case Severity.Warn  => yellow("[Warn]")
+                };
+                let output = prefix + text(" ") + m;
+                let _ = k();
+                output
+            }
+        }
+
+    ///
+    /// Handles the `Logger` effect, by returning a string instead.
+    ///
+    pub def runWithRichString(f: Unit -> a \ ef): RichString \ (ef - Logger) = handleWithRichString(f)()
     @Deprecated
     pub def withBatching(f: Unit -> a \ ef): a \ (ef - Logger) + Logger =
         region rc {
