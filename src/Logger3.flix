@@ -3,6 +3,7 @@ eff Logger3 {
 }
 
 mod Logger3 {
+    use Logger2.runWithHttpFallback
     use Logger3.LogRecord
     import java.lang.ProcessHandle;
     use Net.IpAddr
@@ -300,4 +301,191 @@ mod Logger3 {
         run {
             f()
         } with runWithFilter((r) -> let LogRecord({severity = sev | _}) = r; Order.greaterEqual(sev, s))
+
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    ///
+    /// Raises a new `Logger` effect for fallback incase Http fails.
+    ///
+    pub def runWithHttpFallback(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http + Logger3 =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let res = Net.Http.post(url, formatMessage(format, r));
+                match res {
+                    case Ok(_response) => k()
+                    case Err(_t) => {
+                        Logger3.warn("Logging to http failed. Using fallback");
+                        Logger3.log(r);
+                        k()
+                    }
+                }
+            }
+        }
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    /// Silently fails if http fails.
+    ///
+    pub def runWithHttp(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http = 
+        run {
+            f()
+        } with Logger3.runWithHttpFallback(format, url)
+        with Logger3.runWithIgnore
+    
+    ///
+    /// Handles the `Logger` effect, by ignoring it.
+    ///
+    pub def runWithIgnore(f: Unit -> b \ ef): b \ (ef - Logger3) = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(_r, k) = k()
+        }
+    ///
+    /// Handles the Logger effect in `f` with both `h1` and `h2`. 
+    ///
+    pub def runWithMultisink(
+        h1: (Unit -> Unit \ Logger3) -> x \ ef4, 
+        h2: (Unit -> Unit \ Logger3) -> y \ ef5, 
+        f: Unit -> a \ ef3): a \ (ef3 - Logger3) + ef4 + ef5 = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = 
+                let _ = run {
+                     Logger3.log(r)
+                 } with h1;
+                 let _ = run {
+                     Logger3.log(r)
+                 } with h2;
+                k()
+        }
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
+    pub def runWithTCP(format: String, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO =
+        let resSock = Net.TcpConnect.connect(ip, port);
+            run {
+                f()
+            } with handler Logger3 {
+                def log(r, k) = {
+                    match resSock {
+                        case Err(_t) => Logger3.log(r); k()
+                        case Ok(sock) => {
+                            let str = formatMessage(format, r);
+                            region rc {
+                                let bytes = String.toBytes(str);
+                                let arr = Vector.toArray(rc, bytes);
+                                let res = Net.TcpSocket.write(arr, sock);
+                                match res {
+                                    case Err(_t) => Logger3.log(r)
+                                    case Ok(_) => ()
+                                }
+                            };
+                            k()
+                        }
+                    }
+                }
+            }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    ///
+    /// Terminating handler for the `Logger` effect, that will batch multiples of the same log messages that are sent within `timeout` of each other.
+    ///
+    /// Uses a seperate thread for handling the batching. 
+    ///
+    pub def withBatchingThread(h1: (Unit -> Unit \ (Logger3 + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, 
+    timeout: Time.Duration, f: Unit -> a \ ef ): a \ (ef - Logger3) + Chan + NonDet + IO =
+        region rc {
+            let (tx, rx) = Channel.unbuffered();
+            let (closetx, closerx) = Channel.unbuffered();
+            spawn batchingThread(h1, timeout, rx, closerx) @ rc;
+            run {
+                let res = f();
+                Channel.send((), closetx);
+                res
+            } with handler Logger {
+                def log(r, k) = {
+                    Channel.send(r, tx);
+                    k()
+                }
+            }
+        }
+        
+    ///
+    /// Helper function for `withBatchingThread` doing the logging 
+    ///
+    def batchingThread(h1: (Unit -> Unit \ (Logger + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, timeout: Time.Duration, reciever: Receiver[(Severity, RichString)], closer: Receiver[Unit]): Unit \ IO + NonDet + Chan =
+        run {
+            let timeoutms = Time.Duration.toMillis(timeout) |> Int64.clampToInt32(min = 0, max = Int32.maxValue());
+            region rc {
+                let batch = Ref.fresh(rc, List.empty());
+                let last = Ref.fresh(rc, (Severity.Info, RichString.empty()));
+                let times = Ref.fresh(rc, 0);
+                let endBatching = Ref.fresh(rc, false);
+                def loop() = {
+                    let chanTimeout = Channel.timeout(timeoutms, Time.TimeUnit.Milliseconds);
+                    select {
+                        case pair <- Channel.recv(reciever) => {
+                            let (s, m) = pair;
+                            Ref.transform((xs) -> (s, m) :: xs, batch)
+                        }
+                        case _ <- Channel.recv(chanTimeout) => {
+                            let logs = Ref.get(batch);
+                            Ref.put(List.empty(), batch);
+                            logs |> List.reverse |> List.forEach(match (s, m) -> {
+                                let it = Ref.get(times);
+                                let (ls, lm) = Ref.get(last);
+                                let eq = s == ls and (m == lm);
+                                if (it == 0) {
+                                    Ref.put((s, m), last);
+                                    Ref.put(it + 1, times);
+                                    Logger.log(s, m)
+                                } else if (eq) {
+                                    Ref.put(it + 1, times)
+                                } else if (it == 1) {
+                                    Ref.put((s, m), last);
+                                    Logger.log(s, m)
+                                } else {
+                                    Logger.log(Info, RichString.fromString("-- Repeated ${it}X times --"));
+                                    Ref.put((s, m), last);
+                                    Logger.log(s, m);
+                                    Ref.put(1, times)
+                                }
+                            });
+                            if (Ref.get(times) > 1) {
+                                Logger.log(Info, RichString.fromString("-- Repeated ${Ref.get(times)}X times --"))
+                            };
+                            Ref.put(0, times)
+                        }
+                        case _ <- Channel.recv(closer) => {
+                            Ref.put(true, endBatching)
+                        }
+                    };
+                    if (not List.isEmpty(Ref.get(batch)) or not Ref.get(endBatching)) {
+                        loop()
+                    }
+                };
+                loop()
+            }
+        } with h1
 }
