@@ -25,7 +25,7 @@ mod TestLogger3{
         run {
             Logger3.fatal("%test")
         } 
-        with Logger3.withOther(Map#{"%test" => "Hello, world"})
+        with Logger3.withAux(Map#{"%test" => "Hello, world"})
         with Logger3.runWithIO
 
     // prints a message formatted as a apache common-log

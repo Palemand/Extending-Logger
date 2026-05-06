@@ -1,24 +1,18 @@
 eff Logger3 {
-    def log(info: Logger3.Info, m: RichString): Unit
+    def log(r: Logger3.LogRecord): Unit
 }
 
 mod Logger3 {
     use Net.IpAddr
-    use Info.Info
     use RichString.{gray, cyan, green, yellow, red, bold, text};
     use Logger.Severity
+    use Logger3.LogRecord.LogRecord
 
-    /**
-    TODO:
-    - RichString handling
-    - Escape characters
-     */
-
-    pub enum Info ({
-        severity = Severity, 
+    pub enum LogRecord ({
+        message = RichString,
+        severity = Logger.Severity, 
         timestamp = Option[String], 
-        sysInfo = Map[String, String],
-        other = Map[String, String]
+        aux = Map[String, String]
     })
 
     @DefaultHandler
@@ -26,8 +20,8 @@ mod Logger3 {
         run {
             f()
         } with handler Logger3 {
-            def log(info, m, k) = 
-                let rs = formatMessage(defaultFormat(), m, info);
+            def log(r, k) = 
+                let rs = formatMessage(defaultFormat(), r);
                 println(rs);
                 k()
         }
@@ -36,62 +30,60 @@ mod Logger3 {
         run {
             f()
         } with handler Logger3 {
-            def log(info, m, k) = 
-                let rs = formatMessage(fmt, m, info);
+            def log(r, k) = 
+                let rs = formatMessage(fmt, r);
                 println(rs);
                 k()
         }
 
-    def formatMessage(fmt: String, m: RichString, info: Logger3.Info): String \ {} = 
-        let Info({
+    def formatMessage(fmt: String, r: LogRecord): String \ {} = 
+        let LogRecord({
+            message = msg,
             severity = sv,
             timestamp = ts,
-            sysInfo = si,
-            other = ot
-        }) = info;
+            aux = aux
+        }) = r;
         let pref = "(?<!(?<!\\\\)\\\\)";
         let s = Map.foldLeftWithKey(acc -> reg -> v ->
-            //Regex.replace(src = reg, dst = v, acc),
             String.replaceMatches(regex = pref + reg, to = v, acc), 
             fmt, 
-            ot |> Map.insert("%severity", "${sv}")
+            aux |> Map.insert("%severity", "${sv}")
             |> Map.insert("%timestamp", "${Option.getWithDefault("", ts)}")
-            |> Map.insert("%sysInfo", "${if (Map.isEmpty(si)) "None" else "${si}"}")
         );
-        String.replaceMatches(regex = pref + "%msg", to = "${m}", s)
+        String.replaceMatches(regex = pref + "%msg", to = "${msg}", s)
 
     pub def withTimestamp(f: Unit -> a \ ef): a \ ef + Logger3 + Timestamp = 
         run {
             f()
         } with handler Logger3 {
-            def log(info, m, k) = 
-                let Info(i) = info;
-                let info_ = Info({timestamp = Some(Timestamp.getTimestamp()) | i});
-                Logger3.log(info_, m);
+            def log(r, k) = 
+                let LogRecord(i) = r;
+                let record = LogRecord({timestamp = Some(Timestamp.getTimestamp()) | i});
+                Logger3.log(record);
                 k()
         }
 
-    pub def withOther(other: Map[String, String], f: Unit -> a \ ef): a \ ef + Logger3 = 
+    pub def withAux(aux: Map[String, String], f: Unit -> a \ ef): a \ ef + Logger3 = 
         run {
             f()
         } with handler Logger3 {
-            def log(info, m, k) = 
-                let Info({other = old | _}) = info;
-                let Info(i) = info;
-                let n = Map.union(other, old);
-                let info_ = (Info({other = n | i}));
-                Logger3.log(info_, m);
+            def log(r, k) = 
+                let LogRecord({aux = old | _}) = r;
+                let LogRecord(i) = r;
+                let n = Map.union(aux, old);
+                let info_ = (LogRecord({aux = n | i}));
+                Logger3.log(info_);
                 k()
         }
 
     def logSeverity(s: Severity, m: String): Unit \ Logger3 = 
-        let i = Info({
+        let i = LogRecord({
             severity = s, 
+            message = RichString.text(m),
             timestamp = None,
-            sysInfo = Map.empty(),
-            other = Map.empty()
+            aux = Map.empty()
         });
-        Logger3.log(i, RichString.text(m))
+        Logger3.log(i)
 
     pub def trace(m: String): Unit \ Logger3 = 
         logSeverity(Severity.Trace, m)
@@ -112,9 +104,9 @@ mod Logger3 {
         run {
             f()
         } with handler Logger3 {
-            def log(info, m, k) = 
-                let Info({severity = s | _}) = info;
-                let m_ = formatMessage(defaultFormat(), m, info);
+            def log(r, k) = 
+                let LogRecord({severity = s | _}) = r;
+                let m_ = formatMessage(defaultFormat(), r);
                 Logger.log(s, RichString.text(m_));
                 k()
         }
@@ -133,91 +125,23 @@ mod Logger3 {
             "%status" => "${status}",
             "%size" => "${size}"
         };
-        let info = Info({
+        let r = LogRecord({
+            message = RichString.text(message),
             severity = Option.getWithDefault(Severity.Info, s), 
             timestamp = Some(Timestamp.getTimestamp()),
-            sysInfo = Map.empty(),
-            other = other
+            aux = other
         });
-        Logger3.log(info, RichString.text(message))
-    // TODO: TERMINATING HANDLER
-    // pub def withCommonLogFormat(f: Unit -> a \ ef): a \ ef + Logger3 = 
-    //     run {
-    //         f()
-    //     } with handler Logger3 {
-    //         def log(info, m, k) = 
-    //             let Info(i) = info;
-    //             let info_ = Info({format = commonLogFormat() | i});
-    //             Logger3.log(info_, m);
-    //             k()
-    //     }
+        Logger3.log(r)
 
     pub def runWithCommonLogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO = 
         runWithIOFmt(commonLogFormat(), f)
 
     def commonLogFormat(): String = 
         "%ip - %name [%timestamp] \"%msg\" %status %size"
-    // TODO: replace with a terminating handler with this format
-    // pub def withCustomFormat(format: String, f: Unit -> a \ ef): a \ ef + Logger3 = 
-    //     run {
-    //         f()
-    //     } with handler Logger3 {
-    //         def log(info, m, k) = 
-    //             let Info(i) = info;
-    //             let info_ = (Info({format = format | i}));
-    //             Logger3.log(info_, m);
-    //             k()
-    //     }
-
-
-    // TODO: Same thing
-    // pub def withSyslogFormat(priority: Int32, hostname: String, application: String, pid: Int32, f: Unit -> a \ ef): a \ ef + Logger3 + Timestamp = 
-    //     run {
-    //         f()
-    //     } with handler Logger3 {
-    //         def log(info, m, k) = 
-    //             let Info({other = old, timestamp = timestamp | _}) = info;
-    //             let ts = match timestamp {
-    //                 case None => Some(Timestamp.getTimestamp())
-    //                 case Some(t) => Some(t)
-    //             };
-    //             let other = Map#{
-    //                 "%priority" => "${priority}",
-    //                 "%hostname" => hostname,
-    //                 "%application" => application,
-    //                 "%pid" => "${pid}"
-    //             };
-    //             let Info(i) = info;
-    //             let n = Map.union(other, old);
-    //             let info_ = Info({other = n, format = syslogFormat(), timestamp = ts | i});
-    //             Logger3.log(info_, m);
-    //             k()
-    //     }
     
     def syslogFormat(): String = 
         "<%priority>%timestamp %hostname %application[%pid]: %msg"
 
     pub def runWithSyslogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
         runWithIOFmt(syslogFormat(), f)
-
-    // pub def withRichSeverity(f: Unit -> a \ ef): a \ ef + Logger3 = 
-    //     run {
-    //         f()
-    //     } with handler Logger3 {
-    //         def log(info, m, k) = 
-    //             let Info(i) = info;
-    //             let {format = fmt, severity = sv | _} = i;
-    //             let s = "%severity";
-    //             let sv_ = match sv {
-    //                 case Severity.Debug => cyan(s)
-    //                 case Severity.Fatal => bold(red(s))
-    //                 case Severity.Info  => green(s)
-    //                 case Severity.Trace => gray(s)
-    //                 case Severity.Warn  => yellow(s)
-    //             };
-    //             let newFmt = String.replaceMatches(regex=s, to="${sv_}", fmt);
-    //             let info_ = Info({format = newFmt | i});
-    //             Logger3.log(info_, m);
-    //             k()
-    //     }
 }
