@@ -5,5 +5,4 @@ artifact/
 build/
 lib/
 crash_report_*.txt
-schedules/*
-sizes/*
+testing/*

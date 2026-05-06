@@ -14,7 +14,7 @@ def tryFileSize(): Unit \ Sys.Env + Fs.FileWrite + Fs.FileStat = {
         foreach (i <- List.range(0, 10)) {            
             Logger.info("Iteration ${i}")
         }
-    } with Logger2.runWithFileSizeRollover(Fs.Size.bytes(20i64), "testing/sizes/anderserenost.txt")
+    } with Logger2.runWithFileSizeRollover(Fs.Size.bytes(20i64), 100,"testing/sizes/anderserenost.txt")
     with Fs.FileSize.runWithFileStat
     with Fs.MkDirs.runWithFileWrite
 }
