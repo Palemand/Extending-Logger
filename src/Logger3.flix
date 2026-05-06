@@ -3,6 +3,7 @@ eff Logger3 {
 }
 
 mod Logger3 {
+    use Logger3.LogRecord
     import java.lang.ProcessHandle;
     use Net.IpAddr
     use RichString.{gray, cyan, green, yellow, red, bold, text};
@@ -163,14 +164,140 @@ mod Logger3 {
     ///
     pub def commonLogFormat(): String = 
         "%ip - %name [%timestamp] \"%msg\" %status %size"
-    ///
-    /// Syslog format.
-    ///
-    pub def syslogFormat(): String = 
-        "<%priority>%timestamp %hostname %application[%pid]: %msg"
+
     ///
     /// IO handler that uses the syslog format.
     ///
     pub def runWithSyslogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
         runWithIOFmt(syslogFormat(), f)
+
+    ///
+    /// Syslog format.
+    ///
+    pub def syslogFormat(): String = 
+        "<%priority>%timestamp %hostname %application[%pid]: %msg"
+
+    ///
+    /// Handles the `Logger` effect of the given function `f`, printing to StdOut.
+    /// 
+    /// In other words, re-interprets the `Logger` effect using the `Console` effect.
+    ///
+    pub def handleWithStdOut(format: String, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                Sys.Console.println(rs);
+                k()
+            }
+        }
+    
+    ///
+    /// Handles the `Logger` effect of the given function `f`, printing to StdErr.
+    /// 
+    /// In other words, re-interprets the `Logger` effect using the `Console` effect.
+    ///
+    pub def handleWithStdErr(format: String, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                Sys.Console.eprintln(rs);
+                k()
+            }
+        }
+
+    ///
+    /// Runs the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Aborts if an error is encountered while writing to file.
+    ///
+    pub def runWithFileWriteAbort(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Abort =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                let res = Fs.FileWrite.append({str = rs}, file);
+                match res {
+                    case Err(e) => Abort.abort(RichString.text(e))
+                    case Ok() => ()
+                };
+                k()
+            }
+        }
+
+    ///
+    /// Runs the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Ignores errors encountered while writing.
+    ///
+    pub def runWithFileWrite(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                let _ = Fs.FileWrite.append({str = rs}, file);
+                k()
+            }
+        }
+
+    ///
+    /// Aborts with the message from `Logger3.log` if given function `g` returns true on the logrecord.
+    /// Otherwise, lets `Logger` effect propagate.
+    ///
+    pub def runWithAbort(format: String, g: Logger3.LogRecord -> Bool \ ef1, f: Unit -> a \ ef2): a \ ef1 + ef2 + Abort + Logger3 = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) =
+                if (g(r)) {
+                    Abort.abort({let LogRecord({message = msg | _}) = r; msg})
+                } else {
+                    Logger3.log(r); k()
+                }
+            }
+    ///
+    /// Runs the `Logger` effect of the given function `f`.
+    ///
+    /// In other words, returns a list of `LogRecord`, which is ordered by the calls to log.
+    ///
+    pub def runWithList(f: Unit -> b \ ef): (b, List[LogRecord]) \ (ef - Logger3) = 
+        run {
+            (f(), List.empty())
+        } with handler Logger3 {
+            def log(r, k) = {
+                let (res, l) = k();
+                (res, r :: l)
+            }
+        }
+    ///
+    /// Middleware handler that filters the logging, by the `filter` function,
+    /// only allowing the records that return true.
+    ///
+    pub def runWithFilter(filter: (LogRecord) -> Bool \ ef1, f: Unit -> b \ ef2): b \ (ef2 - Logger3) + Logger3 + ef1 =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                if (filter(r)) {
+                    Logger3.log(r);
+                    k()
+                } else {
+                    k()
+                }
+            }
+        }
+    ///
+    /// Filters logs with greater or equal severity level
+    ///
+    pub def runWithSeverityFilter(s: Severity, f: Unit -> b \ ef): b \ (ef - Logger3) + Logger3 =
+        run {
+            f()
+        } with runWithFilter((r) -> let LogRecord({severity = sev | _}) = r; Order.greaterEqual(sev, s))
 }
