@@ -668,7 +668,7 @@ pub mod Logger2 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
+    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env = 
         let durationMillis = Time.Duration.toMillis(dur);
         x -> {
             let sep = Env.getFileSeparator();
@@ -698,7 +698,7 @@ pub mod Logger2 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
+    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env = 
         handleWithScheduledFiles(startMillis, dur, path, f)()
 
     ///
