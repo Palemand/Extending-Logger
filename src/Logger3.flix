@@ -107,7 +107,7 @@ mod Logger3 {
                 k()
         }
 
-    def logSeverity(s: Severity, m: String): Unit \ Logger3 = 
+    def logSeverity(s: Severity, m: a): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a] = 
         let i = LogRecord({
             severity = s, 
             message = RichString.text(m),
@@ -118,27 +118,27 @@ mod Logger3 {
     ///
     /// Logs the message `m` at the `Trace` level.
     ///
-    pub def trace(m: String): Unit \ Logger3 = 
+    pub def trace(m: a): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a]= 
         logSeverity(Severity.Trace, m)
     ///
     /// Logs the message `m` at the `Debug` level.
     ///
-    pub def debug(m: String): Unit \ Logger3 = 
+    pub def debug(m: a): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a]= 
         logSeverity(Severity.Debug, m)
     ///
     /// Logs the message `m` at the `Info` level.
     ///
-    pub def info(m: String): Unit \ Logger3 = 
+    pub def info(m: a): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a]= 
         logSeverity(Severity.Info, m)
     ///
     /// Logs the message `m` at the `Warn` level.
     ///
-    pub def warn(m: String): Unit \ Logger3 = 
+    pub def warn(m: a): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a]= 
         logSeverity(Severity.Warn, m)
     ///
     /// Logs the message `m` at the `Fatal` level.
     ///
-    pub def fatal(m: String): Unit \ Logger3 = 
+    pub def fatal(m: a): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a]= 
         logSeverity(Severity.Fatal, m)
     ///
     /// Default format for log events.
