@@ -4,7 +4,6 @@ eff Logger3 {
 
 mod Logger3 {
     use Logger3.LogRecord
-    import java.lang.ProcessHandle;
     use Net.IpAddr
     use RichString.{gray, cyan, green, yellow, red, bold, text};
     use Logger.Severity
@@ -21,15 +20,15 @@ mod Logger3 {
     }) 
 
     ///
-    /// LogRecords are equal when everything except the timestamp matches.
+    /// LogRecords are equal when everything matches.
     ///
     instance Eq[LogRecord] {
         pub def eq(x: LogRecord, y: LogRecord): Bool = 
             match (x,y) {
                 case (
-                    LogRecord({message = rsx, severity = sx, timestamp = _tsx, aux = auxx}),
-                    LogRecord({message = rsy, severity = sy, timestamp = _tsy, aux = auxy})
-                ) => rsx == rsy and sx == sy and auxx == auxy 
+                    LogRecord({message = rsx, severity = sx, timestamp = tsx, aux = auxx}),
+                    LogRecord({message = rsy, severity = sy, timestamp = tsy, aux = auxy})
+                ) => rsx == rsy and sx == sy and auxx == auxy and tsy == tsx
             }
     }
 
@@ -467,7 +466,10 @@ mod Logger3 {
                             logs |> List.reverse |> List.forEach(r -> {
                                 let it = Ref.get(times);
                                 let lr = Ref.get(last);
-                                let eq = r == lr;
+                                let eq = {match (r, lr) { case (
+                                        LogRecord({ aux = auxx, message = rs1, severity = sx, timestamp = _ }),
+                                        LogRecord({ aux = auxy, message = rs2, severity = sy, timestamp = _ })
+                                    ) => auxx == auxy and rs1 == rs2 and sx == sy}}; 
                                 if (it == 0) {
                                     Ref.put(r, last);
                                     Ref.put(it + 1, times);
