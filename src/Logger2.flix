@@ -486,7 +486,7 @@ pub mod Logger2 {
             } with handler Logger {
                 def log(s, m, k) = {
                     let (ls, lm) = Ref.get(last);
-                    let cmp = s == ls and equals(m, lm);
+                    let cmp = s == ls and (m == lm);
                     let count = Ref.get(n);
                     match (cmp, count) {
                         case (_, 0) => {
@@ -602,7 +602,7 @@ pub mod Logger2 {
                             logs |> List.reverse |> List.forEach(match (s, m) -> {
                                 let it = Ref.get(times);
                                 let (ls, lm) = Ref.get(last);
-                                let eq = s == ls and equals(m, lm);
+                                let eq = s == ls and (m == lm);
                                 if (it == 0) {
                                     Ref.put((s, m), last);
                                     Ref.put(it + 1, times);
@@ -668,7 +668,7 @@ pub mod Logger2 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
+    pub def handleWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: a -> b \ ef): a -> b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env = 
         let durationMillis = Time.Duration.toMillis(dur);
         x -> {
             let sep = Env.getFileSeparator();
@@ -698,7 +698,7 @@ pub mod Logger2 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env + IO = 
+    pub def runWithScheduledFiles(startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Env = 
         handleWithScheduledFiles(startMillis, dur, path, f)()
 
     ///

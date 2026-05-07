@@ -3,6 +3,7 @@ eff Logger3 {
 }
 
 mod Logger3 {
+    use Logger3.LogRecord
     import java.lang.ProcessHandle;
     use Net.IpAddr
     use RichString.{gray, cyan, green, yellow, red, bold, text};
@@ -17,7 +18,20 @@ mod Logger3 {
         severity = Logger.Severity, 
         timestamp = Option[String], 
         aux = Map[String, String]
-    })
+    }) 
+
+    ///
+    /// LogRecords are equal when everything except the timestamp matches.
+    ///
+    instance Eq[LogRecord] {
+        pub def eq(x: LogRecord, y: LogRecord): Bool = 
+            match (x,y) {
+                case (
+                    LogRecord({message = rsx, severity = sx, timestamp = _tsx, aux = auxx}),
+                    LogRecord({message = rsy, severity = sy, timestamp = _tsy, aux = auxy})
+                ) => rsx == rsy and sx == sy and auxx == auxy 
+            }
+    }
 
     ///
     /// Runs the `Logger` effect of the given function `f`.
@@ -163,14 +177,440 @@ mod Logger3 {
     ///
     pub def commonLogFormat(): String = 
         "%ip - %name [%timestamp] \"%msg\" %status %size"
-    ///
-    /// Syslog format.
-    ///
-    pub def syslogFormat(): String = 
-        "<%priority>%timestamp %hostname %application[%pid]: %msg"
+
     ///
     /// IO handler that uses the syslog format.
     ///
     pub def runWithSyslogFormat(f: Unit -> a \ ef): a \ (ef - Logger3) + IO =
         runWithIOFmt(syslogFormat(), f)
+
+    ///
+    /// Syslog format.
+    ///
+    pub def syslogFormat(): String = 
+        "<%priority>%timestamp %hostname %application[%pid]: %msg"
+
+    ///
+    /// Handles the `Logger` effect of the given function `f`, printing to StdOut.
+    /// 
+    /// In other words, re-interprets the `Logger` effect using the `Console` effect.
+    ///
+    pub def handleWithStdOut(format: String, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                Sys.Console.println(rs);
+                k()
+            }
+        }
+    
+    ///
+    /// Handles the `Logger` effect of the given function `f`, printing to StdErr.
+    /// 
+    /// In other words, re-interprets the `Logger` effect using the `Console` effect.
+    ///
+    pub def handleWithStdErr(format: String, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                Sys.Console.eprintln(rs);
+                k()
+            }
+        }
+
+    ///
+    /// Runs the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Aborts if an error is encountered while writing to file.
+    ///
+    pub def runWithFileWriteAbort(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Abort =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                let res = Fs.FileWrite.append({str = rs}, file);
+                match res {
+                    case Err(e) => Abort.abort(RichString.text(e))
+                    case Ok() => ()
+                };
+                k()
+            }
+        }
+
+    ///
+    /// Runs the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Ignores errors encountered while writing.
+    ///
+    pub def runWithFileWrite(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let rs = formatMessage(format, r);
+                let _ = Fs.FileWrite.append({str = rs}, file);
+                k()
+            }
+        }
+
+    ///
+    /// Aborts with the message from `Logger3.log` if given function `g` returns true on the logrecord.
+    /// Otherwise, lets `Logger` effect propagate.
+    ///
+    pub def runWithAbort(g: Logger3.LogRecord -> Bool \ ef1, f: Unit -> a \ ef2): a \ ef1 + ef2 + Abort + Logger3 = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) =
+                if (g(r)) {
+                    Abort.abort({let LogRecord({message = msg | _}) = r; msg})
+                } else {
+                    Logger3.log(r); k()
+                }
+            }
+    ///
+    /// Runs the `Logger` effect of the given function `f`.
+    ///
+    /// In other words, returns a list of `LogRecord`, which is ordered by the calls to log.
+    ///
+    pub def runWithList(f: Unit -> b \ ef): (b, List[LogRecord]) \ (ef - Logger3) = 
+        run {
+            (f(), List.empty())
+        } with handler Logger3 {
+            def log(r, k) = {
+                let (res, l) = k();
+                (res, r :: l)
+            }
+        }
+    ///
+    /// Middleware handler that filters the logging, by the `filter` function,
+    /// only allowing the records that return true.
+    ///
+    pub def runWithFilter(filter: (LogRecord) -> Bool \ ef1, f: Unit -> b \ ef2): b \ (ef2 - Logger3) + Logger3 + ef1 =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                if (filter(r)) {
+                    Logger3.log(r);
+                    k()
+                } else {
+                    k()
+                }
+            }
+        }
+    ///
+    /// Filters logs with greater or equal severity level
+    ///
+    pub def runWithSeverityFilter(s: Severity, f: Unit -> b \ ef): b \ (ef - Logger3) + Logger3 =
+        run {
+            f()
+        } with runWithFilter((r) -> let LogRecord({severity = sev | _}) = r; Order.greaterEqual(sev, s))
+
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    ///
+    /// Raises a new `Logger` effect for fallback incase Http fails.
+    ///
+    pub def runWithHttpFallback(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http + Logger3 =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let res = Net.Http.post(url, formatMessage(format, r));
+                match res {
+                    case Ok(_response) => k()
+                    case Err(_t) => {
+                        Logger3.warn("Logging to http failed. Using fallback");
+                        Logger3.log(r);
+                        k()
+                    }
+                }
+            }
+        }
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    /// Silently fails if http fails.
+    ///
+    pub def runWithHttp(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http = 
+        run {
+            f()
+        } with Logger3.runWithHttpFallback(format, url)
+        with Logger3.runWithIgnore
+    
+    ///
+    /// Handles the `Logger` effect, by ignoring it.
+    ///
+    pub def runWithIgnore(f: Unit -> b \ ef): b \ (ef - Logger3) = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(_r, k) = k()
+        }
+    ///
+    /// Handles the Logger effect in `f` with both `h1` and `h2`. 
+    ///
+    pub def runWithMultisink(
+        h1: (Unit -> Unit \ Logger3) -> x \ ef4, 
+        h2: (Unit -> Unit \ Logger3) -> y \ ef5, 
+        f: Unit -> a \ ef3): a \ (ef3 - Logger3) + ef4 + ef5 = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = 
+                let _ = run {
+                     Logger3.log(r)
+                 } with h1;
+                 let _ = run {
+                     Logger3.log(r)
+                 } with h2;
+                k()
+        }
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
+    pub def runWithTCP(format: String, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO =
+        let resSock = Net.TcpConnect.connect(ip, port);
+            run {
+                f()
+            } with handler Logger3 {
+                def log(r, k) = {
+                    match resSock {
+                        case Err(_t) => Logger3.log(r); k()
+                        case Ok(sock) => {
+                            let str = formatMessage(format, r);
+                            region rc {
+                                let bytes = String.toBytes(str);
+                                let arr = Vector.toArray(rc, bytes);
+                                let res = Net.TcpSocket.write(arr, sock);
+                                match res {
+                                    case Err(_t) => Logger3.log(r)
+                                    case Ok(_) => ()
+                                }
+                            };
+                            k()
+                        }
+                    }
+                }
+            }
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    ///
+    /// Terminating handler for the `Logger` effect, that will batch multiples of the same log messages that are sent within `timeout` of each other.
+    ///
+    /// Uses a seperate thread for handling the batching. 
+    ///
+    pub def withBatchingThread(h1: (Unit -> Unit \ (Logger3 + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, 
+    timeout: Time.Duration, f: Unit -> a \ ef ): a \ (ef - Logger3) + Chan + NonDet + IO =
+        region rc {
+            let (tx, rx) = Channel.unbuffered();
+            let (closetx, closerx) = Channel.unbuffered();
+            spawn batchingThread(h1, timeout, rx, closerx) @ rc;
+            run {
+                let res = f();
+                Channel.send((), closetx);
+                res
+            } with handler Logger3 {
+                def log(r, k) = {
+                    Channel.send(r, tx);
+                    k()
+                }
+            }
+        }
+        
+    ///
+    /// Helper function for `withBatchingThread` doing the logging 
+    ///
+    def batchingThread(h1: (Unit -> Unit \ (Logger3 + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, timeout: Time.Duration, reciever: Receiver[LogRecord], closer: Receiver[Unit]): Unit \ IO + NonDet + Chan =
+        run {
+            let timeoutms = Time.Duration.toMillis(timeout) |> Int64.clampToInt32(min = 0, max = Int32.maxValue());
+            region rc {
+                let batch = Ref.fresh(rc, List.empty());
+                let last = Ref.fresh(rc, LogRecord(
+                    { aux = Map.empty(), message = RichString.fromString(""), severity = Logger.Severity.Info, timestamp = None}));
+                let times = Ref.fresh(rc, 0);
+                let endBatching = Ref.fresh(rc, false);
+                def loop() = {
+                    let chanTimeout = Channel.timeout(timeoutms, Time.TimeUnit.Milliseconds);
+                    select {
+                        case r <- Channel.recv(reciever) => {
+                            Ref.transform((xs) -> r :: xs, batch)
+                        }
+                        case _ <- Channel.recv(chanTimeout) => {
+                            let logs = Ref.get(batch);
+                            Ref.put(List.empty(), batch);
+                            logs |> List.reverse |> List.forEach(r -> {
+                                let it = Ref.get(times);
+                                let lr = Ref.get(last);
+                                let eq = r == lr;
+                                if (it == 0) {
+                                    Ref.put(r, last);
+                                    Ref.put(it + 1, times);
+                                    Logger3.log(r)
+                                } else if (eq) {
+                                    Ref.put(it + 1, times)
+                                } else if (it == 1) {
+                                    Ref.put(r, last);
+                                    Logger3.log(r)
+                                } else {
+                                    Logger3.info("-- Repeated ${it}X times --");
+                                    Ref.put(r, last);
+                                    Logger3.log(r);
+                                    Ref.put(1, times)
+                                }
+                            });
+                            if (Ref.get(times) > 1) {
+                                Logger3.info(("-- Repeated ${Ref.get(times)}X times --"))
+                            };
+                            Ref.put(0, times)
+                        }
+                        case _ <- Channel.recv(closer) => {
+                            Ref.put(true, endBatching)
+                        }
+                    };
+                    if (not List.isEmpty(Ref.get(batch)) or not Ref.get(endBatching)) {
+                        loop()
+                    }
+                };
+                loop()
+            }
+        } with h1
+
+    ///
+    /// Middleware for removing repeated logs. Only lets each distinct (s, m)-pair be logged once.
+    ///
+    pub def withNoRepeats(f: Unit -> a \ ef): a \ ef + Logger3 = 
+        region rc {
+            let ref: Ref[List[LogRecord], rc] = Ref.fresh(rc, Nil);
+            run {
+                f()
+            } with handler Logger3 {
+                def log(r, k) = 
+                    let last = Ref.get(ref);
+                    match last {
+                        case Nil => 
+                            Logger3.log(r);
+                            Ref.put(r :: Nil, ref)
+                        case xs => 
+                            if (List.memberOf(r, xs)) {
+                                ()
+                            } else {
+                                Logger3.log(r);
+                                Ref.put((r) :: xs, ref)
+                            }
+                    };
+                    k()
+            }
+        }
+
+    ///
+    /// Handles the `Logger` effect, by writing to a set of files seperated by a schedule.
+    ///
+    /// The `path` controls directory, base name and extension of versioned log files.
+    ///
+    pub def runWithScheduledFiles(format: String, startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger3) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Sys.Env + IO = 
+        let durationMillis = Time.Duration.toMillis(dur);
+        let sep = Sys.Env.getFileSeparator();
+        let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
+        let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
+        let _ = Fs.MkDirs.mkDirs(dir);
+        let file = split |> Option.getWithDefault(("", path)) |> snd;
+        let fileNameSplit = file |> String.findIndexOfRight(c -> c == '.') |> Option.map(o -> String.splitAt(o, file));
+        let fileBase = fileNameSplit |> Option.getWithDefault((file, "")) |> fst;
+        let fileExt = fileNameSplit |> Option.getWithDefault(("", "")) |> snd;
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let now = Time.Clock.now();
+                let st = now - startMillis;
+                let ver = st / durationMillis;
+                let newfile = "${dir}${sep}${fileBase}${ver}${fileExt}";
+                let output = formatMessage(format, r);
+                let _ = Fs.FileWrite.append(str = output, newfile);
+                k()
+            }
+        }
+    ///
+    /// Handles the `Logger` effect, by writing to a set of files, each with a max fileSize.
+    ///
+    /// The `path` controls directory, base name and extension of versioned log files.
+    ///
+    pub def runWithFileSizeRollover(format: String, max: Fs.Size, maxFiles: Int32, path: String, f: Unit -> b \ ef): b \ (ef - Logger3) + Fs.FileWrite + Fs.FileStat + Fs.MkDirs + Sys.Env =
+        let sep = Sys.Env.getFileSeparator();
+        let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
+        let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
+        let _ = Fs.MkDirs.mkDirs(dir);
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let _ = run {
+                    Fs.FileWrite.append(str = formatMessage(format, r), path)
+                } with Fs.FileWrite.withSizeRotation(max, maxFiles);
+                k()
+            }
+        }
+
+    ///
+    /// Handles the `Logger` effect of the given function `f`. Appends the logged to `file`.
+    ///
+    /// Discards style from the logged messages. 
+    /// Reraises `Logger` to report errors encountered while writing. 
+    ///
+    pub def runWithFileWriteLog(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Logger3 =
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = {
+                let output = formatMessage(format, r);
+                let res = Fs.FileWrite.append({str = output}, file);
+                match res {
+                    case Err(e) => /* Logger.log(s, m); */ Logger3.warn("${e}")
+                    case Ok() => ()
+                };
+                k()
+            }
+        }
+    ///
+    /// A wrapper for a terminal handler of the `Logger` effect.
+    /// Creates a handler that handles `Logger` with handler `h`,
+    /// and then reraises the effect.
+    ///
+    pub def reraise(h: (Unit -> Unit \ Logger3) -> x \ ef1, f: Unit -> a \ ef2): a \ ef2 + ef1 + Logger3 = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = 
+                let _ = run {
+                    Logger3.log(r)
+                } with h;
+                Logger3.log(r);
+                k()
+        }
 }
