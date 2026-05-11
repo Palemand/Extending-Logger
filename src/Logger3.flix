@@ -115,6 +115,7 @@ mod Logger3 {
             aux = Map.empty()
         });
         Logger3.log(i)
+    
     ///
     /// Logs the message `m` at the `Trace` level.
     ///
@@ -243,23 +244,6 @@ mod Logger3 {
         }
 
     ///
-    /// Runs the `Logger` effect of the given function `f`. Appends the logged to `file`.
-    ///
-    /// Discards style from the logged messages. 
-    /// Ignores errors encountered while writing.
-    ///
-    pub def runWithFileWrite(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite = 
-        run {
-            f()
-        } with handler Logger3 {
-            def log(r, k) = {
-                let rs = formatMessage(format, r);
-                let _ = Fs.FileWrite.append({str = rs}, file);
-                k()
-            }
-        }
-
-    ///
     /// Aborts with the message from `Logger3.log` if given function `g` returns true on the logrecord.
     /// Otherwise, lets `Logger` effect propagate.
     ///
@@ -288,6 +272,7 @@ mod Logger3 {
                 (res, r :: l)
             }
         }
+    
     ///
     /// Middleware handler that filters the logging, by the `filter` function,
     /// only allowing the records that return true.
@@ -315,35 +300,133 @@ mod Logger3 {
 
     ///
     /// Handles the `Logger` effect by sending a post request with the `Http` effect.
-    ///
+    /// 
     /// Raises a new `Logger` effect for fallback incase Http fails.
     ///
-    pub def runWithHttpFallback(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http + Logger3 =
-        run {
-            f()
+    pub def handleWithHttp(format: String, url: String, f: a -> b \ ef1): a -> b \ (ef1 - Logger3) + Net.Http + Logger3 = 
+        x -> run {
+            f(x)
         } with handler Logger3 {
             def log(r, k) = {
                 let res = Net.Http.post(url, formatMessage(format, r));
                 match res {
                     case Ok(_response) => k()
                     case Err(_t) => {
-                        Logger3.warn("Logging to http failed. Using fallback");
                         Logger3.log(r);
                         k()
                     }
                 }
             }
         }
+
     ///
     /// Handles the `Logger` effect by sending a post request with the `Http` effect.
-    /// Silently fails if http fails.
     ///
     pub def runWithHttp(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http = 
         run {
-            f()
-        } with Logger3.runWithHttpFallback(format, url)
-        with Logger3.runWithIgnore
+            handleWithHttp(format, url, f)()
+        } with runWithIgnore
+
+    ///
+    /// Handles the `Logger` effect by sending a post request with the `Http` effect.
+    ///
+    /// Raises a new `Logger` effect for fallback incase Http fails.
+    ///
+    pub def runWithHttpFallback(format: String, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http + Logger3 = 
+        handleWithHttp(format, url, f)()
+
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
+    def handleWithTCP(format: String, ip: Net.IpAddr, port: Int16, f: a -> b \ ef): 
+        a -> b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO = {
+        x -> {
+            let resSock = Net.TcpConnect.connect(ip, port);
+            run {
+                f(x)
+            } with handler Logger3 {
+                def log(r, k) = {
+                    match resSock {
+                        case Err(_t) => Logger3.log(r); k()
+                        case Ok(sock) => {
+                            let str = formatMessage(format, r);
+                            region rc {
+                                let bytes = String.toBytes(str);
+                                let arr = Vector.toArray(rc, bytes);
+                                let res = Net.TcpSocket.write(arr, sock);
+                                match res {
+                                    case Err(_t) => Logger3.log(r)
+                                    case Ok(_) => ()
+                                }
+                            };
+                            k()
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
+    /// Raises a new `Logger` effect for fallback incase TCP fails.
+    ///
+    pub def runWithTCPFallback(format: String, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef):b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO = 
+        handleWithTCP(format, ip, port, f)()
+
+
+    ///
+    /// Handles the `Logger` effect, by sending it over a TCP connection.
+    ///
+    pub def runWithTCP(format: String, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger3) + IO + Net.TcpConnect =
+        run {
+            handleWithTCP(format, ip, port, f)()
+        } with runWithIgnore
     
+    ///
+    /// Handles the `Logger` effect by writing to a file. 
+    /// If the file does not exist, it is created.
+    /// Discards style from the logged messages. 
+    ///
+    /// Raises a new `Logger` effect for fallback incase FileWrite fails.
+    ///
+    def handleWithFileWrite(format: String, file: String, f: a -> b \ ef): a -> b \ (ef - Logger3) + Fs.FileWrite + Logger3 = 
+        x -> run {
+            f(x)
+        } with handler Logger3 {
+            def log(r, k) = {
+                let output = formatMessage(format, r);
+                let writeRes = Fs.FileWrite.append({str = output}, file);
+                match writeRes {
+                    case Err(_) => Logger3.log(r); k()
+                    case Ok(_) => k()
+                }
+            }
+        }
+
+    ///
+    /// Runs the `Logger` effect by writing to a file. 
+    /// If the file does not exist, it is created.
+    /// Discards style from the logged messages. 
+    ///
+    /// Raises a new `Logger` effect for fallback incase FileWrite fails.
+    ///
+    pub def runWithFileWriteFallback(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Logger3 = 
+        handleWithFileWrite(format, file, f)()
+
+    ///
+    /// Runs the `Logger` effect by writing to a file. 
+    /// If the file does not exist, it is created.
+    /// Discards style from the logged messages. 
+    ///
+    /// Raises a new `Logger` effect for fallback incase FileWrite fails.
+    ///
+    pub def runWithFileWrite(format: String, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite = 
+        run {
+            handleWithFileWrite(format, file, f)()
+        } with runWithIgnore
+
     ///
     /// Handles the `Logger` effect, by ignoring it.
     ///
@@ -372,52 +455,6 @@ mod Logger3 {
                  } with h2;
                 k()
         }
-    ///
-    /// Handles the `Logger` effect, by sending it over a TCP connection.
-    ///
-    pub def runWithTCP(format: String, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO =
-        let resSock = Net.TcpConnect.connect(ip, port);
-            run {
-                f()
-            } with handler Logger3 {
-                def log(r, k) = {
-                    match resSock {
-                        case Err(_t) => Logger3.log(r); k()
-                        case Ok(sock) => {
-                            let str = formatMessage(format, r);
-                            region rc {
-                                let bytes = String.toBytes(str);
-                                let arr = Vector.toArray(rc, bytes);
-                                let res = Net.TcpSocket.write(arr, sock);
-                                match res {
-                                    case Err(_t) => Logger3.log(r)
-                                    case Ok(_) => ()
-                                }
-                            };
-                            k()
-                        }
-                    }
-                }
-            }
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
     
     ///
     /// Terminating handler for the `Logger` effect, that will batch multiples of the same log messages that are sent within `timeout` of each other.
@@ -599,6 +636,7 @@ mod Logger3 {
                 k()
             }
         }
+
     ///
     /// A wrapper for a terminal handler of the `Logger` effect.
     /// Creates a handler that handles `Logger` with handler `h`,
