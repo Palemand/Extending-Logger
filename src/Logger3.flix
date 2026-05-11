@@ -277,7 +277,7 @@ mod Logger3 {
     /// Middleware handler that filters the logging, by the `filter` function,
     /// only allowing the records that return true.
     ///
-    pub def runWithFilter(filter: (LogRecord) -> Bool \ ef1, f: Unit -> b \ ef2): b \ (ef2 - Logger3) + Logger3 + ef1 =
+    pub def withFilter(filter: (LogRecord) -> Bool \ ef1, f: Unit -> b \ ef2): b \ (ef2 - Logger3) + Logger3 + ef1 =
         run {
             f()
         } with handler Logger3 {
@@ -293,10 +293,10 @@ mod Logger3 {
     ///
     /// Filters logs with greater or equal severity level
     ///
-    pub def runWithSeverityFilter(s: Severity, f: Unit -> b \ ef): b \ (ef - Logger3) + Logger3 =
+    pub def withSeverityFilter(s: Severity, f: Unit -> b \ ef): b \ (ef - Logger3) + Logger3 =
         run {
             f()
-        } with runWithFilter((r) -> let LogRecord({severity = sev | _}) = r; Order.greaterEqual(sev, s))
+        } with withFilter((r) -> let LogRecord({severity = sev | _}) = r; Order.greaterEqual(sev, s))
 
     ///
     /// Handles the `Logger` effect by sending a post request with the `Http` effect.
