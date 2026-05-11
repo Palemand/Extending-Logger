@@ -461,7 +461,7 @@ mod Logger3 {
     ///
     /// Uses a seperate thread for handling the batching. 
     ///
-    pub def withBatchingThread(h1: (Unit -> Unit \ (Logger3 + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, 
+    pub def runWithBatchingThread(h1: (Unit -> Unit \ (Logger3 + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, 
     timeout: Time.Duration, f: Unit -> a \ ef ): a \ (ef - Logger3) + Chan + NonDet + IO =
         region rc {
             let (tx, rx) = Channel.unbuffered();
@@ -480,7 +480,7 @@ mod Logger3 {
         }
         
     ///
-    /// Helper function for `withBatchingThread` doing the logging 
+    /// Helper function for `runWithBatchingThread` doing the logging 
     ///
     def batchingThread(h1: (Unit -> Unit \ (Logger3 + NonDet + Chan + IO)) -> Unit \ IO + NonDet + Chan, timeout: Time.Duration, reciever: Receiver[LogRecord], closer: Receiver[Unit]): Unit \ IO + NonDet + Chan =
         run {
