@@ -82,4 +82,15 @@ mod TestLogger3{
     //     with Fs.FileWrite.runWithIO
     //     with Timestamp.runWithIO
     //     with Logger3.runWithIO
+
+    pub def runWithRichFormat01(): Unit \ IO = 
+        run {
+            Logger3.info("hello world")
+        } with Logger3.runWithIOFmt(RichString.red("%severity %message"))
+
+    pub def runWithRichFormat02(): Unit \ IO = 
+        run {
+            Logger3.info("hello world")
+        } with Logger3.runWithIOFmt(RichString.bgRed("%severity") + RichString.text(" ") + RichString.bgGreen("%message"))
+
 }
