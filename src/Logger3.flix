@@ -654,4 +654,13 @@ mod Logger3 {
                 Logger3.log(r);
                 k()
         }
+
+    pub def logWithAux(m: RichString, s: Logger.Severity, aux: Map[String, String]): Unit \ Logger3 = 
+        let r = LogRecord({ 
+            aux = aux,
+            message = m, 
+            severity = s, 
+            timestamp = None 
+        });
+        Logger3.log(r)
 }
