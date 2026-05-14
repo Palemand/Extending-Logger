@@ -47,15 +47,16 @@ mod Logger3 {
                 println(rs);
                 k()
         }
+
     ///
     /// Runs the `Logger` effect of the given function `f`, with a specified format.
     ///
-    pub def runWithIOFmt(fmt: d, f: Unit -> a \ ef): a \ (ef - Logger3) + IO with ToString[d] =
+    pub def runWithIOFmt(format: d, f: Unit -> a \ ef): a \ (ef - Logger3) + IO with ToString[d] =
         run {
             f()
         } with handler Logger3 {
             def log(r, k) = 
-                let rs = formatMessage(fmt, r);
+                let rs = formatMessage(format, r);
                 println(rs);
                 k()
         }
@@ -67,14 +68,14 @@ mod Logger3 {
             timestamp = ts,
             aux = aux
         }) = r;
-        let pref = "(?<!(?<!\\\\)\\\\)";
         let s = Map.foldLeftWithKey(acc -> reg -> v ->
-            String.replaceMatches(regex = pref + reg, to = v, acc), 
+            String.replaceMatches(regex = "\\{${reg}\\}", to = v, acc), 
             ToString.toString(fmt), 
-            aux |> Map.insert("%severity", "${sv}")
-            |> Map.insert("%timestamp", "${Option.getWithDefault("", ts)}")
+            aux |> Map.insert("severity", "${sv}")
+            |> Map.insert("timestamp", "${Option.getWithDefault("", ts)}")
         );
-        String.replaceMatches(regex = pref + "%message", to = "${msg}", s)
+        String.replaceMatches(regex = "\\{message\\}", to = "${msg}", s)
+    
     ///
     /// Middleware handler that attaches a timestamp from whenever the handler is invoked.
     ///
@@ -145,7 +146,7 @@ mod Logger3 {
     /// Default format for log events.
     ///
     pub def defaultFormat(): String = 
-        "%timestamp[%severity] %msg"
+        "{timestamp}[{severity}] {message}"
     ///
     /// Logs an event given all the auxillery information to fulfill the commonlog format.
     ///
@@ -155,10 +156,10 @@ mod Logger3 {
             case IpAddr.V6(i) => "${i}"
         };
         let other = Map#{
-            "%ip" => "${ip_}",
-            "%name" => name,
-            "%status" => "${status}",
-            "%size" => "${size}"
+            "ip" => "${ip_}",
+            "name" => name,
+            "status" => "${status}",
+            "size" => "${size}"
         };
         let r = LogRecord({
             message = RichString.text(message),
@@ -176,7 +177,7 @@ mod Logger3 {
     /// Commonlog format.
     ///
     pub def commonLogFormat(): String = 
-        "%ip - %name [%timestamp] \"%msg\" %status %size"
+        "{ip} - {name} [{timestamp}] \"{messsage}\" {status} {size}"
 
     ///
     /// IO handler that uses the syslog format.
@@ -188,7 +189,7 @@ mod Logger3 {
     /// Syslog format.
     ///
     pub def syslogFormat(): String = 
-        "<%priority>%timestamp %hostname %application[%pid]: %msg"
+        "<{priority}>{timestamp} {hostname} {application}[{pid}]: {messsage}"
 
     ///
     /// Handles the `Logger` effect of the given function `f`, printing to StdOut.

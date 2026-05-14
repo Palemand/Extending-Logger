@@ -1,5 +1,6 @@
 *.fpkg
 *.jar
+*.log
 .GITHUB_TOKEN
 artifact/
 build/

@@ -93,4 +93,9 @@ mod TestLogger3{
             Logger3.info("hello world")
         } with Logger3.runWithIOFmt(RichString.bgRed("%severity") + RichString.text(" ") + RichString.bgGreen("%message"))
 
+    pub def runWithRichFormat03(): Unit \ IO = 
+        run {
+            Logger3.info("hello world")
+        } with Logger3.runWithIOFmt(RichString.bgRed("{severity}") + RichString.text(" ") + RichString.bgGreen("{message}"))
+
 }
