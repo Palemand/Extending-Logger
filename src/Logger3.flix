@@ -93,7 +93,7 @@ mod Logger3 {
         }
 
     ///
-    /// Middleware handler that attaches auxillery information to the log record.
+    /// Middleware handler that attaches auxiliary information to the log record.
     ///
     pub def withAux(aux: Map[String, String], f: Unit -> a \ ef): a \ ef + Logger3 = 
         run {
@@ -148,7 +148,7 @@ mod Logger3 {
     pub def defaultFormat(): String = 
         "{timestamp}[{severity}] {message}"
     ///
-    /// Logs an event given all the auxillery information to fulfill the commonlog format.
+    /// Logs an event given all the auxiliary information to fulfill the commonlog format.
     ///
     pub def logCommonLog(ip: Net.IpAddr, name: String, message: String, status: Int32, size: Int32, s: Option[Severity]): Unit \ Logger3 + Timestamp = 
         let ip_ = match ip {
@@ -655,10 +655,15 @@ mod Logger3 {
                 k()
         }
 
-    pub def logWithAux(m: RichString, s: Logger.Severity, aux: Map[String, String]): Unit \ Logger3 = 
+    ///
+    /// Logs a message with a severity and some auxiliary information.
+    /// Stores auxiliary information in a Map[String, String]. 
+    /// Use {key} in the format given to the handler to display the value.
+    ///
+    pub def logWithAux(m: a, s: Logger.Severity, aux: Map[String, String]): Unit \ Logger3 + Formattable.Aef[a] with Formattable[a] = 
         let r = LogRecord({ 
             aux = aux,
-            message = m, 
+            message = RichString.text(m), 
             severity = s, 
             timestamp = None 
         });

@@ -110,4 +110,14 @@ mod TestLogger3{
             Logger3.info("Hello with a timestamp!")
         } with Logger3.runWithIO
 
+    pub def escapeChars(): Unit \ IO = 
+        run {
+            Logger3.info("Hello with escaped chars")
+        } with Logger3.runWithIOFmt("{message} | \\{message\\}")
+
+    pub def auxiliaryInfo(): Unit \ IO = 
+        run {
+            Logger3.logWithAux("Hello world", Logger.Severity.Fatal, Map#{"test" => "success"})
+        } with Logger3.runWithIOFmt("{message} | {test}")
+
 }
