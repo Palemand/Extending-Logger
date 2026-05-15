@@ -93,4 +93,21 @@ mod TestLogger3{
             Logger3.info("hello world")
         } with Logger3.runWithIOFmt(RichString.bgRed("%severity") + RichString.text(" ") + RichString.bgGreen("%message"))
 
+    pub def runWithRichFormat03(): Unit \ IO = 
+        run {
+            Logger3.info("hello world")
+        } with Logger3.runWithIOFmt(RichString.bgRed("{severity}") + RichString.text(" ") + RichString.bgGreen("{message}"))
+
+
+    pub def runWithRichFormat04(): Unit \ IO + Timestamp = 
+        run {
+            Logger3.info("Hello from Flix!")
+        } with Logger3.withTimestamp 
+        with Logger3.runWithIOFmt("{timestamp} [{severity}] {message}") 
+
+    pub def runWithRichFormat05(): Unit \ IO = 
+        run {
+            Logger3.info("Hello with a timestamp!")
+        } with Logger3.runWithIO
+
 }
