@@ -51,12 +51,12 @@ mod Logger3 {
     ///
     /// Runs the `Logger` effect of the given function `f`, with a specified format.
     ///
-    pub def runWithIOFmt(format: d, f: Unit -> a \ ef): a \ (ef - Logger3) + IO with ToString[d] =
+    pub def runWithIOFmt(fmt: d, f: Unit -> a \ ef): a \ (ef - Logger3) + IO with ToString[d] =
         run {
             f()
         } with handler Logger3 {
             def log(r, k) = 
-                let rs = formatMessage(format, r);
+                let rs = formatMessage(fmt, r);
                 println(rs);
                 k()
         }
@@ -196,12 +196,12 @@ mod Logger3 {
     /// 
     /// In other words, re-interprets the `Logger` effect using the `Console` effect.
     ///
-    pub def handleWithStdOut(format: d, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console with ToString[d] = 
+    pub def handleWithStdOut(fmt: d, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console with ToString[d] = 
         run {
             f()
         } with handler Logger3 {
             def log(r, k) = {
-                let rs = formatMessage(format, r);
+                let rs = formatMessage(fmt, r);
                 Sys.Console.println(rs);
                 k()
             }
@@ -212,12 +212,12 @@ mod Logger3 {
     /// 
     /// In other words, re-interprets the `Logger` effect using the `Console` effect.
     ///
-    pub def handleWithStdErr(format: d, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console with ToString[d] = 
+    pub def handleWithStdErr(fmt: d, f: Unit -> b \ ef): b \ ef - Logger3 + Sys.Console with ToString[d] = 
         run {
             f()
         } with handler Logger3 {
             def log(r, k) = {
-                let rs = formatMessage(format, r);
+                let rs = formatMessage(fmt, r);
                 Sys.Console.eprintln(rs);
                 k()
             }
@@ -229,12 +229,12 @@ mod Logger3 {
     /// Discards style from the logged messages. 
     /// Aborts if an error is encountered while writing to file.
     ///
-    pub def runWithFileWriteAbort(format: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Abort with ToString[d] =
+    pub def runWithFileWriteAbort(fmt: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Abort with ToString[d] =
         run {
             f()
         } with handler Logger3 {
             def log(r, k) = {
-                let rs = formatMessage(format, r);
+                let rs = formatMessage(fmt, r);
                 let res = Fs.FileWrite.append({str = rs}, file);
                 match res {
                     case Err(e) => Abort.abort(RichString.text(e))
@@ -304,12 +304,12 @@ mod Logger3 {
     /// 
     /// Raises a new `Logger` effect for fallback incase Http fails.
     ///
-    pub def handleWithHttp(format: d, url: String, f: a -> b \ ef1): a -> b \ (ef1 - Logger3) + Net.Http + Logger3 with ToString[d] = 
+    pub def handleWithHttp(fmt: d, url: String, f: a -> b \ ef1): a -> b \ (ef1 - Logger3) + Net.Http + Logger3 with ToString[d] = 
         x -> run {
             f(x)
         } with handler Logger3 {
             def log(r, k) = {
-                let res = Net.Http.post(url, formatMessage(format, r));
+                let res = Net.Http.post(url, formatMessage(fmt, r));
                 match res {
                     case Ok(_response) => k()
                     case Err(_t) => {
@@ -323,9 +323,9 @@ mod Logger3 {
     ///
     /// Handles the `Logger` effect by sending a post request with the `Http` effect.
     ///
-    pub def runWithHttp(format: d, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http with ToString[d] = 
+    pub def runWithHttp(fmt: d, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http with ToString[d] = 
         run {
-            handleWithHttp(format, url, f)()
+            handleWithHttp(fmt, url, f)()
         } with runWithIgnore
 
     ///
@@ -333,13 +333,13 @@ mod Logger3 {
     ///
     /// Raises a new `Logger` effect for fallback incase Http fails.
     ///
-    pub def runWithHttpFallback(format: d, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http + Logger3 with ToString[d] = 
-        handleWithHttp(format, url, f)()
+    pub def runWithHttpFallback(fmt: d, url: String, f: Unit -> b \ ef1 ): b \ (ef1 - Logger3) + Net.Http + Logger3 with ToString[d] = 
+        handleWithHttp(fmt, url, f)()
 
     ///
     /// Handles the `Logger` effect, by sending it over a TCP connection.
     ///
-    def handleWithTCP(format: d, ip: Net.IpAddr, port: Int16, f: a -> b \ ef): 
+    def handleWithTCP(fmt: d, ip: Net.IpAddr, port: Int16, f: a -> b \ ef): 
         a -> b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO with ToString[d] = {
         x -> {
             let resSock = Net.TcpConnect.connect(ip, port);
@@ -350,7 +350,7 @@ mod Logger3 {
                     match resSock {
                         case Err(_t) => Logger3.log(r); k()
                         case Ok(sock) => {
-                            let str = formatMessage(format, r);
+                            let str = formatMessage(fmt, r);
                             region rc {
                                 let bytes = String.toBytes(str);
                                 let arr = Vector.toArray(rc, bytes);
@@ -373,16 +373,16 @@ mod Logger3 {
     ///
     /// Raises a new `Logger` effect for fallback incase TCP fails.
     ///
-    pub def runWithTCPFallback(format: d, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef):b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO with ToString[d] = 
-        handleWithTCP(format, ip, port, f)()
+    pub def runWithTCPFallback(fmt: d, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef):b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO with ToString[d] = 
+        handleWithTCP(fmt, ip, port, f)()
 
 
     ///
     /// Handles the `Logger` effect, by sending it over a TCP connection.
     ///
-    pub def runWithTCP(format: d, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger3) + IO + Net.TcpConnect with ToString[d] =
+    pub def runWithTCP(fmt: d, ip: Net.IpAddr, port: Int16, f: Unit -> b \ ef): b \ (ef - Logger3) + IO + Net.TcpConnect with ToString[d] =
         run {
-            handleWithTCP(format, ip, port, f)()
+            handleWithTCP(fmt, ip, port, f)()
         } with runWithIgnore
     
     ///
@@ -392,12 +392,12 @@ mod Logger3 {
     ///
     /// Raises a new `Logger` effect for fallback incase FileWrite fails.
     ///
-    def handleWithFileWrite(format: d, file: String, f: a -> b \ ef): a -> b \ (ef - Logger3) + Fs.FileWrite + Logger3 with ToString[d] = 
+    def handleWithFileWrite(fmt: d, file: String, f: a -> b \ ef): a -> b \ (ef - Logger3) + Fs.FileWrite + Logger3 with ToString[d] = 
         x -> run {
             f(x)
         } with handler Logger3 {
             def log(r, k) = {
-                let output = formatMessage(format, r);
+                let output = formatMessage(fmt, r);
                 let writeRes = Fs.FileWrite.append({str = output}, file);
                 match writeRes {
                     case Err(_) => Logger3.log(r); k()
@@ -413,8 +413,8 @@ mod Logger3 {
     ///
     /// Raises a new `Logger` effect for fallback incase FileWrite fails.
     ///
-    pub def runWithFileWriteFallback(format: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Logger3 with ToString[d] = 
-        handleWithFileWrite(format, file, f)()
+    pub def runWithFileWriteFallback(fmt: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Logger3 with ToString[d] = 
+        handleWithFileWrite(fmt, file, f)()
 
     ///
     /// Runs the `Logger` effect by writing to a file. 
@@ -423,9 +423,9 @@ mod Logger3 {
     ///
     /// Raises a new `Logger` effect for fallback incase FileWrite fails.
     ///
-    pub def runWithFileWrite(format: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite with ToString[d] = 
+    pub def runWithFileWrite(fmt: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite with ToString[d] = 
         run {
-            handleWithFileWrite(format, file, f)()
+            handleWithFileWrite(fmt, file, f)()
         } with runWithIgnore
 
     ///
@@ -573,7 +573,7 @@ mod Logger3 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def runWithScheduledFiles(format: d, startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger3) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Sys.Env + IO with ToString[d] = 
+    pub def runWithScheduledFiles(fmt: d, startMillis: Int64, dur: Time.Duration, path: String, f: Unit -> b \ ef): b \ (ef - Logger3) + Time.Clock + Fs.FileWrite + Fs.MkDirs + Sys.Env + IO with ToString[d] = 
         let durationMillis = Time.Duration.toMillis(dur);
         let sep = Sys.Env.getFileSeparator();
         let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
@@ -591,7 +591,7 @@ mod Logger3 {
                 let st = now - startMillis;
                 let ver = st / durationMillis;
                 let newfile = "${dir}${sep}${fileBase}${ver}${fileExt}";
-                let output = formatMessage(format, r);
+                let output = formatMessage(fmt, r);
                 let _ = Fs.FileWrite.append(str = output, newfile);
                 k()
             }
@@ -601,7 +601,7 @@ mod Logger3 {
     ///
     /// The `path` controls directory, base name and extension of versioned log files.
     ///
-    pub def runWithFileSizeRollover(format: d, max: Fs.Size, maxFiles: Int32, path: String, f: Unit -> b \ ef): b \ (ef - Logger3) + Fs.FileWrite + Fs.FileStat + Fs.MkDirs + Sys.Env with ToString[d] =
+    pub def runWithFileSizeRollover(fmt: d, max: Fs.Size, maxFiles: Int32, path: String, f: Unit -> b \ ef): b \ (ef - Logger3) + Fs.FileWrite + Fs.FileStat + Fs.MkDirs + Sys.Env with ToString[d] =
         let sep = Sys.Env.getFileSeparator();
         let split = String.findIndexOfRight(c -> c == String.charAt(0, sep), path) |> Option.map(o -> String.splitAt(o + 1, path));
         let dir = split |> Option.getWithDefault((".${sep}", "")) |> fst;
@@ -611,7 +611,7 @@ mod Logger3 {
         } with handler Logger3 {
             def log(r, k) = {
                 let _ = run {
-                    Fs.FileWrite.append(str = formatMessage(format, r), path)
+                    Fs.FileWrite.append(str = formatMessage(fmt, r), path)
                 } with Fs.FileWrite.withSizeRotation(max, maxFiles);
                 k()
             }
@@ -623,12 +623,12 @@ mod Logger3 {
     /// Discards style from the logged messages. 
     /// Reraises `Logger` to report errors encountered while writing. 
     ///
-    pub def runWithFileWriteLog(format: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Logger3 with ToString[d] =
+    pub def runWithFileWriteLog(fmt: d, file: String, f: Unit -> a \ ef): a \ (ef - Logger3) + Fs.FileWrite + Logger3 with ToString[d] =
         run {
             f()
         } with handler Logger3 {
             def log(r, k) = {
-                let output = formatMessage(format, r);
+                let output = formatMessage(fmt, r);
                 let res = Fs.FileWrite.append({str = output}, file);
                 match res {
                     case Err(e) => /* Logger.log(s, m); */ Logger3.warn("${e}")
