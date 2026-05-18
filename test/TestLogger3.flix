@@ -1,4 +1,8 @@
 mod TestLogger3{
+    use Logger3.syslogFormat
+    use Logger3.runWithIOFmt
+    use TestLogger3.prepHandler
+    use Logger3.LogRecord.LogRecord
     import java.util.regex.Pattern
 
     use Net.Ipv4Addr
@@ -115,9 +119,36 @@ mod TestLogger3{
             Logger3.info("Hello with escaped chars")
         } with Logger3.runWithIOFmt("{message} | \\{message\\}")
 
-    pub def auxiliaryInfo(): Unit \ IO = 
+    pub def auxiliaryInfo01(): Unit \ IO = 
         run {
             Logger3.logWithAux("Hello world", Logger.Severity.Fatal, Map#{"test" => "success"})
         } with Logger3.runWithIOFmt("{message} | {test}")
+
+    pub def blursed01(): Unit \ IO = 
+        run {
+            Logger3.info("Hello world")
+        } with prepHandler()
+
+    pub def blursed02(): Unit \ IO = 
+        prepHandler()(() -> Logger3.info("Hello, world!"))
+
+    pub def prepHandler(): (Unit -> a \ ef) -> a \ ef - Logger3 + IO = 
+        handler Logger3 {
+            def log(r, k) = 
+                let LogRecord({ message = m | _ }) = r;
+                println(m);
+                k()
+        }
+    pub def escapechars(): Unit \ IO = 
+        run {
+            Logger3.info("Here's some information")
+        } with runWithIOFmt("\\{message\\}: {message}")
+
+
+
+    pub def syslogExample(): Unit \ IO + Timestamp = 
+        run {
+            Logger3.logSysLog(34, "test-server", "flix", 1234, "Hello, world")
+        } with Logger3.runWithIOFmt(syslogFormat())
 
 }

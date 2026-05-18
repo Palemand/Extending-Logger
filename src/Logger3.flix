@@ -177,7 +177,36 @@ mod Logger3 {
     /// Commonlog format.
     ///
     pub def commonLogFormat(): String = 
-        "{ip} - {name} [{timestamp}] \"{messsage}\" {status} {size}"
+        "{ip} - {name} [{timestamp}] \"{message}\" {status} {size}"
+
+    pub def logSysLog(priority: Int32, hostname: String, app: String, pid: Int32, message: a): Unit \ Logger3 + Timestamp + Formattable.Aef[a] with Formattable[a] = 
+        let sev = severityFromInt(Int32.bitwiseAnd(priority, 7));
+        let r = LogRecord({ 
+            aux = Map#{
+                "priority" => "${priority}",
+                "hostname" => hostname,
+                "application" => app,
+                "pid" => "${pid}"
+            }, 
+            message = RichString.text(message), 
+            severity = sev, 
+            timestamp = Some(Timestamp.getTimestamp()) 
+        });
+        Logger3.log(r)
+
+    def severityFromInt(x: Int32): Severity = 
+        if (x >= 0 and x <= 3) {
+            Severity.Fatal
+        } else if (x == 4) {
+            Severity.Warn
+        } else if (x == 5 or x == 6) {
+            Severity.Info
+        } else if (x == 7) {
+            Severity.Debug
+        } else {
+            Severity.Trace
+        }
+
 
     ///
     /// IO handler that uses the syslog format.
@@ -189,7 +218,7 @@ mod Logger3 {
     /// Syslog format.
     ///
     pub def syslogFormat(): String = 
-        "<{priority}>{timestamp} {hostname} {application}[{pid}]: {messsage}"
+        "<{priority}>{timestamp} {hostname} {application}[{pid}]: {message}"
 
     ///
     /// Handles the `Logger` effect of the given function `f`, printing to StdOut.
