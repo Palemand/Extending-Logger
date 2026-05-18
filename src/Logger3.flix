@@ -68,13 +68,15 @@ mod Logger3 {
             timestamp = ts,
             aux = aux
         }) = r;
+        let pref = "(?<!\\{)\\{";
+        let suff = "\\}(?!\\})";
         let s = Map.foldLeftWithKey(acc -> reg -> v ->
-            String.replaceMatches(regex = "\\{${reg}\\}", to = v, acc), 
+            String.replaceMatches(regex = "${pref}${reg}${suff}", to = v, acc), 
             ToString.toString(fmt), 
             aux |> Map.insert("severity", "${sv}")
             |> Map.insert("timestamp", "${Option.getWithDefault("", ts)}")
         );
-        String.replaceMatches(regex = "\\{message\\}", to = "${msg}", s)
+        String.replaceMatches(regex = "${pref}message${suff}", to = "${msg}", s)
     
     ///
     /// Middleware handler that attaches a timestamp from whenever the handler is invoked.

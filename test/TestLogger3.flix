@@ -142,7 +142,7 @@ mod TestLogger3{
     pub def escapechars(): Unit \ IO = 
         run {
             Logger3.info("Here's some information")
-        } with runWithIOFmt("\\{message\\}: {message}")
+        } with runWithIOFmt("{{{message}}}: {message}")
 
 
 
