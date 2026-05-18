@@ -291,8 +291,9 @@ mod Logger3 {
                 }
             }
         }
+    
     ///
-    /// Filters logs with greater or equal severity level
+    /// Middleware handler that filters out logs with lower severity level.
     ///
     pub def withSeverityFilter(s: Severity, f: Unit -> b \ ef): b \ (ef - Logger3) + Logger3 =
         run {
