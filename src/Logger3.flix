@@ -589,7 +589,10 @@ mod Logger3 {
                             Logger3.log(r);
                             Ref.put(r :: Nil, ref)
                         case xs => 
-                            if (List.memberOf(r, xs)) {
+                            if (not List.forAll(lr -> {
+                                let (LogRecord(r1), LogRecord(r2)) = (lr, r);
+                                r1#aux == r2#aux and r1#message == r2#message and r1#severity == r2#severity
+                            }, xs)) {
                                 ()
                             } else {
                                 Logger3.log(r);
