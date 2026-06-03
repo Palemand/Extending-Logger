@@ -371,7 +371,7 @@ mod Logger3 {
     ///
     /// Handles the `Logger` effect, by sending it over a TCP connection.
     ///
-    def handleWithTCP(fmt: d, ip: Net.IpAddr, port: Int16, f: a -> b \ ef): 
+    pub def handleWithTCP(fmt: d, ip: Net.IpAddr, port: Int16, f: a -> b \ ef): 
         a -> b \ (ef - Logger3) + Net.TcpConnect + Logger3 + IO with ToString[d] = {
         x -> {
             let resSock = Net.TcpConnect.connect(ip, port);
@@ -703,4 +703,25 @@ mod Logger3 {
             timestamp = None 
         });
         Logger3.log(r)
+    
+
+    pub def runWithStdOut(fmt: d, f: Unit -> a \ ef): a \ ef - Logger3 + Sys.Console with ToString[d] = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = 
+                let output = formatMessage(fmt, r);
+                Sys.Console.println(output);
+                k()
+        }
+
+    pub def runWithStdErr(fmt: d, f: Unit -> a \ ef): a \ ef - Logger3 + Sys.Console with ToString[d] = 
+        run {
+            f()
+        } with handler Logger3 {
+            def log(r, k) = 
+                let output = formatMessage(fmt, r);
+                Sys.Console.eprintln(output);
+                k()
+        }
 }

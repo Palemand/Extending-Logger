@@ -1,8 +1,8 @@
 def abcd(): Unit \ IO =
     let res = run {
-        Logger2.info("Something wrong");
+        Logger3.info("Something wrong");
         ""
-    } with Logger2.runWithHttp("notawebsite.not")
+    } with Logger3.runWithHttp(Logger3.defaultFormat(), "notawebsite.not")
     with handler Net.Http {
         def request(req, _k) = {
             let txt = match Net.HttpRequest.body(req) {

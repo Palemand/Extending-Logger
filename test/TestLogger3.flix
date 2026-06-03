@@ -151,4 +151,33 @@ mod TestLogger3{
             Logger3.logSysLog(34, "test-server", "flix", 1234, "Hello, world")
         } with Logger3.runWithIOFmt(syslogFormat())
 
+    pub def kIsNotLast(): Unit \ IO = 
+        let s = run { run {
+            Logger3.info("hello");
+            Sys.Console.println("");
+            "run block"
+        } with handler Logger3 {
+            def log(_, k) = 
+                let s = k(); // console was ....
+                println("In logger handler: ${s}");
+                "Logger was first effect"
+        }} with handler Sys.Console {
+            def readln(k) = ???
+            def print(s, k) = ???
+            def eprint(s, k) = ???
+            def eprintln(s, k) = ???
+            def println(_s, k) = 
+                let s = k(); // run block
+                println("In console handler: ${s}");
+                "Console was first effect"
+        } ;
+        println(s)
+
+    pub def thunkingWithPortals(): Unit \ {} = 
+        let _ = () -> 3;
+        let f1: (Unit -> Int32) -> String = g -> "${g() + 1}";
+        let _ = run {
+            3
+        } with f1;
+        ()
 }

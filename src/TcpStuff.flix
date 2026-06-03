@@ -10,10 +10,10 @@ def runTcp(): Unit \ IO =
         region rc {
             spawn host(server) @ rc;
             run {
-                Logger2.info("helloes over tcp")
-            } with Logger2.runWithTCP(ip, 32001i16)
+                Logger3.info("helloes over tcp")
+            } with Logger3.runWithTCP(Logger3.defaultFormat(), ip, 32001i16)
             with TcpConnect.runWithIO
-            with Logger2.runWithIgnore
+            with Logger3.runWithIgnore
         }
     } with TcpBind.runWithIO
     with Abort.runWithIO
@@ -31,4 +31,3 @@ def host(server: Net.TcpServer): Unit \ IO =
     } with TcpAccept.runWithIO
     with Abort.runWithIO
 
-def main(): Unit \ IO = runTcp()
