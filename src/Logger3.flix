@@ -279,7 +279,7 @@ mod Logger3 {
     /// Aborts with the message from `Logger3.log` if given function `g` returns true on the logrecord.
     /// Otherwise, lets `Logger` effect propagate.
     ///
-    pub def runWithAbort(g: Logger3.LogRecord -> Bool \ ef1, f: Unit -> a \ ef2): a \ ef1 + ef2 + Abort + Logger3 = 
+    pub def withAbort(g: Logger3.LogRecord -> Bool \ ef1, f: Unit -> a \ ef2): a \ ef1 + ef2 + Abort + Logger3 = 
         run {
             f()
         } with handler Logger3 {

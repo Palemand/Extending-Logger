@@ -1,0 +1,72 @@
+@startuml timeOverview
+'left to right direction
+hide empty members
+'skinparam linetype ortho
+'skinparam packageStyle rectangle
+skinparam shadowing false
+skinparam nodesep 18
+skinparam ranksep 18
+
+
+package "Logger" as LoggerPackage {
+    hide empty members
+
+    interface "Logger" as Logger<<Effect>> {
+        {abstract} +log(LogRecord): Unit
+    }
+
+    enum "LogRecord" as LogRecord {
+        -message: RichString
+        -severity: Severity
+        -timestamp: Option[String]
+        -aux: Map[String, String]
+    }
+
+    class LoggerDefs <<Module>> {
+        +trace(a): Unit \ Logger + Formattable.Aef[a] with Formattable[a]  
+        +debug(a): Unit \ Logger + Formattable.Aef[a] with Formattable[a]  
+        +info(a): Unit \ Logger + Formattable.Aef[a] with Formattable[a]  
+        +warn(a): Unit \ Logger + Formattable.Aef[a] with Formattable[a]  
+        +fatal(a): Unit \ Logger + Formattable.Aef[a] with Formattable[a]
+        +defaultFormat(): String
+        +commonLogFormat(): String
+        +syslogFormat(): String
+        +reraise((Unit -> Unit \ Logger) -> x \ ef1, Unit -> a \ ef2): a \ ef2 + ef1 + Logger
+        +logWithAux(a, Severity, Map[String, String]): Unit \ Logger + Formattable.Aef[a] with Formattable[a]
+    }
+    class LoggerHandlers <<Module>> {
+        #runWithIO \ ef - Logger + IO
+        #runWithIOFmt \ ef - Logger + IO
+        #withTimestamp \ ef + Logger + Timestamp
+        #withAux \ ef + Logger
+        #runWithCommonLogFormat \ ef + Logger + IO
+        #runWithSyslogFormat \ ef + Logger + IO
+        #runWithStdOut \ ef - Logger + Console
+        #runWithStdErr \ ef - Logger + Console
+        #runWithFileWriteAbort \ ef - Logger + FileWrite + Abort
+        #withAbort \ ef + ef2 + Logger + Abort
+        #runWithList \ ef - Logger
+        #withFilter \ ef + ef2 + Logger
+        #withSeverityFilter \ ef + Logger
+        #runWithHttp \ ef - Logger + Http
+        #runWithHttpFallback \ ef + Http + Logger
+        #runWithTcp \ ef - Logger + TpcConnect
+        #runWithTcpFallback \ ef + TcpConnect + Logger
+        #runWithFileWrite \ ef - Logger + FileWrite
+        #runWithFileWriteFallback \ ef + FileWrite + Logger
+        #runWithFileWriteLog \ ef - FileWrite + Logger
+        #runWithIgnore \ ef - Logger
+        #runWithMultisink \ ef - Logger + ef3 + ef4
+        #runWithBatchingThread \ ef - Logger + Chan + NonDet + IO
+        #withNoRepeats \ ef + Logger
+        #runWithScheduledFiles \ ef - Logger + Clock + MkDirs + Env + IO
+        #runWithFileSizeRollover \ ef - Logger + FileWrite + FileStat + MkDirs + Env
+
+    }
+}
+'relations
+LoggerDefs ..> Logger : "invokes"
+LoggerHandlers ..> Logger : "invokes"
+LoggerHandlers ..|> Logger : "handles"
+
+@enduml
