@@ -473,8 +473,8 @@ mod Logger3 {
     /// Handles the Logger effect in `f` with both `h1` and `h2`. 
     ///
     pub def runWithMultisink(
-        h1: (Unit -> Unit \ Logger3) -> x \ ef4, 
-        h2: (Unit -> Unit \ Logger3) -> y \ ef5, 
+        h1: (Unit -> Unit \ Logger3) -> x \ ef4 - Logger3, 
+        h2: (Unit -> Unit \ Logger3) -> y \ ef5 - Logger3, 
         f: Unit -> a \ ef3): a \ (ef3 - Logger3) + ef4 + ef5 = 
         run {
             f()
@@ -678,7 +678,7 @@ mod Logger3 {
     /// Creates a handler that handles `Logger` with handler `h`,
     /// and then reraises the effect.
     ///
-    pub def reraise(h: (Unit -> Unit \ Logger3) -> x \ ef1, f: Unit -> a \ ef2): a \ ef2 + ef1 + Logger3 = 
+    pub def reraise(h: (Unit -> Unit \ Logger3) -> x \ ef1 - Logger3, f: Unit -> a \ ef2): a \ ef2 + ef1 + Logger3 = 
         run {
             f()
         } with handler Logger3 {
